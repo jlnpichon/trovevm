@@ -175,10 +175,14 @@ pub fn expr(pairs: &mut pest::iterators::Pairs<Rule>) -> Result<Expr, PestError>
 
             let mut expr = match primary_expr.as_rule() {
                 Rule::Literal => literal(&mut primary_expr.into_inner())?,
-                Rule::grouped_expr => expr(&mut primary_expr.into_inner())?,
+                Rule::grouped_expr => {
+                    // Here we have grouped_expr { inner: [ expr { inner: [ unary_expr ] } ] }
+                    let mut inner = primary_expr.into_inner(); // peel grouped_expr
+                    let xpr = inner.next().unwrap(); // get expr
+                    expr(&mut xpr.into_inner())?
+                }
                 Rule::Identifier => Expr::Variable(primary_expr.as_str().into()),
                 rule => {
-                    println!("unexpected {rule:?}");
                     return Err(pest::error::Error::new_from_span(
                         pest::error::ErrorVariant::ParsingError {
                             positives: vec![],
