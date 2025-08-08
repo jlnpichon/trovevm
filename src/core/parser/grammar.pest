@@ -2,7 +2,7 @@
 program = _{ SOI ~ decl* ~ EOI }
 
 // ---- Declarations ----
-decl = _{ contract_decl | fn_decl | var_decl }
+decl = _{ contract_decl | fn_decl | var_decl | statement }
 
 contract_decl = { CONTRACT_KW ~ Identifier ~ LBRACE ~ (fn_decl | var_decl)* ~ RBRACE }
 
@@ -52,8 +52,8 @@ args = _{ expr ~ (COMMA ~ expr)* }
 unary_op = _{ NOT | NEG }
 
 bin_op = _{
-    EQ
-  | EQEQ
+    EQEQ
+  | EQ
   | GE
   | LE
   | NEQ
@@ -69,14 +69,14 @@ bin_op = _{
 }
 
 // ---- Literals ----
-Literal = { INT | BOOL | NULL_KW | HEXADDR }
-INT     = { MINUS? ~ DIGIT+ }
-BOOL    = { "true" | "false" }
-HEXADDR = { "0x" ~ HEX_DIGIT+ }
+Literal =  { INT | BOOL | NULL_KW | HEXADDR }
+INT     = @{ MINUS? ~ DIGIT+ }
+BOOL    = @{ "true" | "false" }
+HEXADDR = @{ "0x" ~ HEX_DIGIT+ }
 
 // ---- Terminals ----
 Identifier = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
-String     =  { ("\"" ~ dquoted* ~ "\"") | ("'" ~ squoted* ~ "'") }
+String     = @{ ("\"" ~ dquoted* ~ "\"") | ("'" ~ squoted* ~ "'") }
 
 // ---- Keywords ---
 CONTRACT_KW = @{ "contract" }
@@ -95,8 +95,8 @@ RPAREN    = @{ ")" }
 LBRACE    = @{ "{" }
 RBRACE    = @{ "}" }
 COMMA     = @{ "," }
-EQ        = @{ "=" }
 EQEQ      = @{ "==" }
+EQ        = @{ "=" }
 GT        = @{ ">" }
 GE        = @{ ">=" }
 LT        = @{ "<" }
@@ -145,6 +145,6 @@ DIGIT     = { '0'..'9' }
 HEX_DIGIT = { DIGIT | 'a'..'f' | 'A'..'F' }
 
 // ---- Whitespaces dans comments ----
-WHITESPACE = _{ " " | "\t" | "\r" | NEWLINE }
+WHITESPACE = _{ " " | "\t" | "\r" | NEWLINE | COMMENT }
 NEWLINE    = _{ "\r\n" | "\n" }
-COMMENT    = _{ "//" ~ (!"\n" ~ ANY)* }
+COMMENT    = _{ "//" ~ (!NEWLINE ~ ANY)* }

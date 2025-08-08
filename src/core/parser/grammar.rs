@@ -203,6 +203,7 @@ pub fn decl(pair: pest::iterators::Pair<Rule>) -> Result<Statement, PestError> {
         Rule::contract_decl => Statement::ContractDecl(contract_decl(pair.into_inner())?),
         Rule::fn_decl => Statement::FnDecl(fn_decl(pair.into_inner())?),
         Rule::var_decl => Statement::VarDecl(var_decl(pair.into_inner())?),
+        Rule::expr_stmt => statement(pair)?,
         r => {
             println!("r {r:?}");
             return Err(pest::error::Error::new_from_span(

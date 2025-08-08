@@ -36,7 +36,7 @@ fn rule_to_message(rule: &Rule) -> Option<&str> {
         Rule::Identifier => todo!(), //Some(String::from("identifier")),
         Rule::block => todo!(),
         Rule::statement => todo!(),
-        Rule::expr_stmt => todo!(),
+        Rule::expr_stmt => Some("an expression statement"),
         Rule::for_stmt => todo!(),
         Rule::if_stmt => todo!(),
         Rule::while_stmt => todo!(),
