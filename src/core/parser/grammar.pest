@@ -11,7 +11,7 @@ fn_decl = { FN_KW ~ Identifier ~ LPAREN ~ params? ~ RPAREN ~ block }
 var_decl = { LET_KW ~ Identifier ~ (EQ ~ expr)? ~ SEMICOLON }
 
 // ---- Parameters and block ----
-params = { Identifier ~ (COMMA ~ Identifier)* }
+params = _{ Identifier ~ (COMMA ~ Identifier)* }
 
 block = { LBRACE ~ statement* ~ RBRACE }
 

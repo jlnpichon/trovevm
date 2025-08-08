@@ -70,8 +70,14 @@ fn params(pairs: &mut pest::iterators::Pairs<Rule>) -> Result<Vec<String>, PestE
 
     while let Some(peek) = pairs.peek() {
         match peek.as_rule() {
-            Rule::Identifier => params.push(peek.as_str().to_string()),
-            Rule::COMMA => continue,
+            Rule::Identifier => {
+                let param = pairs.next().unwrap().as_str().to_string();
+                params.push(param);
+            }
+            Rule::COMMA => {
+                pairs.next().unwrap();
+                continue;
+            }
             _ => break,
         }
     }
@@ -114,7 +120,6 @@ fn block(mut pairs: pest::iterators::Pairs<Rule>) -> Result<Statement, PestError
         statements.push(statement(pair)?);
     }
 
-    //println!("block {pairs:#?} {statements:#?}");
     expect_rule(&mut pairs, Rule::RBRACE)?;
 
     Ok(Statement::Block(statements))
