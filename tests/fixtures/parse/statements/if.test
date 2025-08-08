@@ -1,0 +1,39 @@
+==INPUT==
+if (a < b) {
+  print("ok");
+}
+==EXPECTED==
+Program {
+    statements: [
+        If {
+            condition: Binary {
+                op: Lt,
+                lhs: Variable(
+                    "a",
+                ),
+                rhs: Variable(
+                    "b",
+                ),
+            },
+            then_branch: Block(
+                [
+                    Expr(
+                        FnCall {
+                            callee: Variable(
+                                "print",
+                            ),
+                            args: [
+                                Literal(
+                                    String(
+                                        "ok",
+                                    ),
+                                ),
+                            ],
+                        },
+                    ),
+                ],
+            ),
+            else_branch: None,
+        },
+    ],
+}

@@ -1,0 +1,71 @@
+==INPUT==
+if (foo(1) < "string") {
+  print("ok");
+} else {
+  print("not ok");
+}
+==EXPECTED==
+Program {
+    statements: [
+        If {
+            condition: Binary {
+                op: Lt,
+                lhs: FnCall {
+                    callee: Variable(
+                        "foo",
+                    ),
+                    args: [
+                        Literal(
+                            Number(
+                                1.0,
+                            ),
+                        ),
+                    ],
+                },
+                rhs: Literal(
+                    String(
+                        "string",
+                    ),
+                ),
+            },
+            then_branch: Block(
+                [
+                    Expr(
+                        FnCall {
+                            callee: Variable(
+                                "print",
+                            ),
+                            args: [
+                                Literal(
+                                    String(
+                                        "ok",
+                                    ),
+                                ),
+                            ],
+                        },
+                    ),
+                ],
+            ),
+            else_branch: Some(
+                Block(
+                    [
+                        Expr(
+                            FnCall {
+                                callee: Variable(
+                                    "print",
+                                ),
+                                args: [
+                                    Literal(
+                                        String(
+                                            "not ok",
+                                        ),
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                ),
+            ),
+        },
+    ],
+}

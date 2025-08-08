@@ -16,6 +16,11 @@ pub enum Statement {
     Block(Vec<Statement>),
     Return(Expr),
     Expr(Expr),
+    If {
+        condition: Expr,
+        then_branch: Box<Statement>,
+        else_branch: Option<Box<Statement>>,
+    },
 }
 
 #[derive(Debug, Clone)]

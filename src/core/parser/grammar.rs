@@ -108,19 +108,39 @@ fn return_statement(mut pairs: pest::iterators::Pairs<Rule>) -> Result<Statement
     )?))
 }
 
+fn if_statement(mut pairs: pest::iterators::Pairs<Rule>) -> Result<Statement, PestError> {
+    expect_rule(&mut pairs, Rule::IF_KW)?;
+
+    expect_rule(&mut pairs, Rule::LPAREN)?;
+    let condition = expr(&mut pairs.next().unwrap().into_inner())?;
+    expect_rule(&mut pairs, Rule::RPAREN)?;
+    let then_branch = block(pairs.next().unwrap().into_inner())?.into();
+
+    let mut else_branch = None;
+    if accept_rule(&mut pairs, Rule::ELSE_KW).is_some() {
+        else_branch = Some(block(pairs.next().unwrap().into_inner())?.into());
+    }
+
+    Ok(Statement::If {
+        condition,
+        then_branch,
+        else_branch,
+    })
+}
+
 fn statement(pair: pest::iterators::Pair<Rule>) -> Result<Statement, PestError> {
     Ok(match pair.as_rule() {
         Rule::var_decl => Statement::VarDecl(var_decl(pair.into_inner())?),
         Rule::expr_stmt => expr_statement(pair.into_inner())?,
         Rule::for_stmt => todo!(),
-        Rule::if_stmt => todo!(),
+        Rule::if_stmt => if_statement(pair.into_inner())?,
         Rule::return_stmt => return_statement(pair.into_inner())?,
         Rule::while_stmt => todo!(),
         Rule::block => block(pair.into_inner())?,
         rule => {
             return Err(Box::new(pest::error::Error::new_from_span(
                 pest::error::ErrorVariant::CustomError {
-                    message: format!("unexpected {:?}, expected Literal", rule),
+                    message: format!("unexpected {:?}, expected statement", rule),
                 },
                 pair.as_span(),
             )));
@@ -203,18 +223,7 @@ pub fn decl(pair: pest::iterators::Pair<Rule>) -> Result<Statement, PestError> {
         Rule::contract_decl => Statement::ContractDecl(contract_decl(pair.into_inner())?),
         Rule::fn_decl => Statement::FnDecl(fn_decl(pair.into_inner())?),
         Rule::var_decl => Statement::VarDecl(var_decl(pair.into_inner())?),
-        Rule::expr_stmt => statement(pair)?,
-        r => {
-            println!("r {r:?}");
-            return Err(pest::error::Error::new_from_span(
-                pest::error::ErrorVariant::ParsingError {
-                    positives: vec![Rule::var_decl],
-                    negatives: vec![r],
-                },
-                pair.as_span(),
-            )
-            .into());
-        }
+        _ => statement(pair)?,
     })
 }
 
