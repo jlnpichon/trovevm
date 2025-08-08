@@ -14,7 +14,7 @@ pub enum Statement {
     FnDecl(Function),
     VarDecl(Var),
     Block(Vec<Statement>),
-    Params,
+    Return(Expr),
     Expr(Expr),
 }
 

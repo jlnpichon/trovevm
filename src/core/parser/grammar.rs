@@ -91,13 +91,20 @@ fn expr_statement(mut pairs: pest::iterators::Pairs<Rule>) -> Result<Statement, 
     )?))
 }
 
+fn return_statement(mut pairs: pest::iterators::Pairs<Rule>) -> Result<Statement, PestError> {
+    expect_rule(&mut pairs, Rule::RETURN_KW)?;
+    Ok(Statement::Return(expr(
+        &mut pairs.next().unwrap().into_inner(),
+    )?))
+}
+
 fn statement(pair: pest::iterators::Pair<Rule>) -> Result<Statement, PestError> {
     Ok(match pair.as_rule() {
         Rule::var_decl => Statement::VarDecl(var_decl(pair.into_inner())?),
         Rule::expr_stmt => expr_statement(pair.into_inner())?,
         Rule::for_stmt => todo!(),
         Rule::if_stmt => todo!(),
-        Rule::return_stmt => todo!(),
+        Rule::return_stmt => return_statement(pair.into_inner())?,
         Rule::while_stmt => todo!(),
         Rule::block => block(pair.into_inner())?,
         rule => {
