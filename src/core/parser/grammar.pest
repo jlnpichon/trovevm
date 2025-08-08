@@ -1,0 +1,150 @@
+// ---- Top-level ----
+program = _{ SOI ~ decl* ~ EOI }
+
+// ---- Declarations ----
+decl = _{ contract_decl | fn_decl | var_decl }
+
+contract_decl = { CONTRACT_KW ~ Identifier ~ LBRACE ~ (fn_decl | var_decl)* ~ RBRACE }
+
+fn_decl = { FN_KW ~ Identifier ~ LPAREN ~ params? ~ RPAREN ~ block }
+
+var_decl = { LET_KW ~ Identifier ~ (EQ ~ expr)? ~ SEMICOLON }
+
+// ---- Parameters and block ----
+params = { Identifier ~ (COMMA ~ Identifier)* }
+
+block = { LBRACE ~ statement* ~ RBRACE }
+
+// ---- Statements ----
+statement = _{
+    expr_stmt
+  | for_stmt
+  | if_stmt
+  | return_stmt
+  | while_stmt
+  | block
+  | var_decl
+}
+
+expr_stmt = { expr ~ SEMICOLON }
+
+for_stmt = {
+    FOR_KW ~ LPAREN ~ (var_decl | expr_stmt | ";") ~ expr? ~ SEMICOLON ~ expr? ~ RPAREN ~ statement
+}
+
+if_stmt = { IF_KW ~ LPAREN ~ expr ~ RPAREN ~ block ~ (ELSE_KW ~ block)? }
+
+while_stmt = { WHILE_KW ~ LPAREN ~ expr ~ RPAREN ~ block }
+
+return_stmt = { RETURN_KW ~ expr ~ SEMICOLON }
+
+// ---- Expressions ----
+expr = { unary_op? ~ unary_expr ~ (bin_op ~ unary_op? ~ unary_expr)* }
+
+unary_expr = { (Literal | Identifier | String | grouped_expr) ~ call_suffix* }
+
+call_suffix = { LPAREN ~ args? ~ RPAREN }
+
+grouped_expr = { "(" ~ expr ~ ")" }
+
+args = _{ expr ~ (COMMA ~ expr)* }
+
+unary_op = _{ NOT | NEG }
+
+bin_op = _{
+    EQ
+  | EQEQ
+  | GE
+  | LE
+  | NEQ
+  | GT
+  | LT
+  | PLUS
+  | MINUS
+  | STAR
+  | SLASH
+  | MODULO
+  | OR
+  | AND
+}
+
+// ---- Literals ----
+Literal = { INT | BOOL | NULL_KW | HEXADDR }
+INT     = { MINUS? ~ DIGIT+ }
+BOOL    = { "true" | "false" }
+HEXADDR = { "0x" ~ HEX_DIGIT+ }
+
+// ---- Terminals ----
+Identifier = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+String     =  { ("\"" ~ dquoted* ~ "\"") | ("'" ~ squoted* ~ "'") }
+
+// ---- Keywords ---
+CONTRACT_KW = @{ "contract" }
+ELSE_KW     = @{ "else" }
+FN_KW       = @{ "fn" }
+FOR_KW      = @{ "for" }
+IF_KW       = @{ "if" }
+LET_KW      = @{ "let" }
+RETURN_KW   = @{ "return" }
+WHILE_KW    = @{ "while" }
+NULL_KW     = @{ "null" }
+
+// ---- Symbols ----
+LPAREN    = @{ "(" }
+RPAREN    = @{ ")" }
+LBRACE    = @{ "{" }
+RBRACE    = @{ "}" }
+COMMA     = @{ "," }
+EQ        = @{ "=" }
+EQEQ      = @{ "==" }
+GT        = @{ ">" }
+GE        = @{ ">=" }
+LT        = @{ "<" }
+LE        = @{ "<=" }
+SEMICOLON = @{ ";" }
+PLUS      = @{ "+" }
+NEG       = @{ "-" }
+MINUS     = @{ "-" }
+MODULO    = @{ "%" }
+OR        = @{ "||" }
+AND       = @{ "&&" }
+STAR      = @{ "*" }
+NOT       = @{ "!" }
+NEQ       = @{ "!=" }
+SLASH     = @{ "/" }
+
+// ---- Auxiliaries ----
+dquoted = _{ UNESCAPED | "'" | "\\\"" | "\\" ~ ESCAPABLE }
+squoted = _{ UNESCAPED | "\"" | "\\'" | "\\" ~ ESCAPABLE }
+
+UNESCAPED = _{
+    " "
+  | "!"
+  | "#"
+  | "$"
+  | "%"
+  | "&"
+  | '\u{0028}'..'\u{005b}'
+  | '\u{005d}'..'\u{0d7ff}'
+  | '\u{e000}'..'\u{10fff}'
+}
+
+ESCAPABLE = _{
+    "\\"
+  | "/"
+  | "\n"
+  | "\r"
+  | "\t"
+  | "\u{0008}"
+  | "\u{000a}"
+  | "\u{000c}"
+  | ("u" ~ HEX_DIGIT{4})
+}
+
+DIGIT     = { '0'..'9' }
+HEX_DIGIT = { DIGIT | 'a'..'f' | 'A'..'F' }
+
+// ---- Whitespaces dans comments ----
+WHITESPACE = _{ " " | "\t" | "\r" | NEWLINE }
+NEWLINE    = _{ "\r\n" | "\n" }
+COMMENT    = _{ "//" ~ (!"\n" ~ ANY)* }

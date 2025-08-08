@@ -1,0 +1,16 @@
+==INPUT==
+contract MyContract { }
+==EXPECTED==
+Program {
+    statements: [
+        ContractDecl(
+            Contract {
+                name: Identifier(
+                    "MyContract",
+                ),
+                vars: [],
+                funcs: [],
+            },
+        ),
+    ],
+}
