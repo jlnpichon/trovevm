@@ -21,6 +21,12 @@ pub enum Statement {
         then_branch: Box<Statement>,
         else_branch: Option<Box<Statement>>,
     },
+    For {
+        initializer: Option<Box<Statement>>,
+        condition: Option<Expr>,
+        increment: Option<Expr>,
+        body: Box<Statement>,
+    },
 }
 
 #[derive(Debug, Clone)]

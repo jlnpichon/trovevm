@@ -128,11 +128,57 @@ fn if_statement(mut pairs: pest::iterators::Pairs<Rule>) -> Result<Statement, Pe
     })
 }
 
+fn for_statement(mut pairs: pest::iterators::Pairs<Rule>) -> Result<Statement, PestError> {
+    expect_rule(&mut pairs, Rule::FOR_KW)?;
+
+    expect_rule(&mut pairs, Rule::LPAREN)?;
+
+    let initializer = match pairs.peek().unwrap().as_rule() {
+        Rule::var_decl => {
+            Some(Statement::VarDecl(var_decl(pairs.next().unwrap().into_inner())?).into())
+        }
+        Rule::expr_stmt => Some(expr_statement(pairs.next().unwrap().into_inner())?.into()),
+        Rule::SEMICOLON => {
+            pairs.next().unwrap();
+            None
+        }
+        r => {
+            println!("{r:#?}");
+            unreachable!()
+        }
+    };
+
+    let condition = if accept_rule(&mut pairs, Rule::SEMICOLON).is_some() {
+        None
+    } else {
+        let xpr = expr(&mut pairs.next().unwrap().into_inner())?;
+        expect_rule(&mut pairs, Rule::SEMICOLON)?;
+        Some(xpr)
+    };
+
+    let increment = if accept_rule(&mut pairs, Rule::RPAREN).is_some() {
+        None
+    } else {
+        let xpr = expr(&mut pairs.next().unwrap().into_inner())?;
+        expect_rule(&mut pairs, Rule::RPAREN)?;
+        Some(xpr)
+    };
+
+    let body = block(pairs.next().unwrap().into_inner())?.into();
+
+    Ok(Statement::For {
+        initializer,
+        condition,
+        increment,
+        body,
+    })
+}
+
 fn statement(pair: pest::iterators::Pair<Rule>) -> Result<Statement, PestError> {
     Ok(match pair.as_rule() {
         Rule::var_decl => Statement::VarDecl(var_decl(pair.into_inner())?),
         Rule::expr_stmt => expr_statement(pair.into_inner())?,
-        Rule::for_stmt => todo!(),
+        Rule::for_stmt => for_statement(pair.into_inner())?,
         Rule::if_stmt => if_statement(pair.into_inner())?,
         Rule::return_stmt => return_statement(pair.into_inner())?,
         Rule::while_stmt => todo!(),

@@ -1,0 +1,27 @@
+==INPUT==
+for(;foo!="string";) {}
+==EXPECTED==
+Program {
+    statements: [
+        For {
+            initializer: None,
+            condition: Some(
+                Binary {
+                    op: Neq,
+                    lhs: Variable(
+                        "foo",
+                    ),
+                    rhs: Literal(
+                        String(
+                            "string",
+                        ),
+                    ),
+                },
+            ),
+            increment: None,
+            body: Block(
+                [],
+            ),
+        },
+    ],
+}

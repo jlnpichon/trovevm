@@ -1,0 +1,30 @@
+==INPUT==
+for(let x=0;;) {}
+==EXPECTED==
+Program {
+    statements: [
+        For {
+            initializer: Some(
+                VarDecl(
+                    Var {
+                        name: Identifier(
+                            "x",
+                        ),
+                        initializer: Some(
+                            Literal(
+                                Number(
+                                    0.0,
+                                ),
+                            ),
+                        ),
+                    },
+                ),
+            ),
+            condition: None,
+            increment: None,
+            body: Block(
+                [],
+            ),
+        },
+    ],
+}

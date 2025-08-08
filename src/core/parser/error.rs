@@ -37,7 +37,7 @@ fn rule_to_message(rule: &Rule) -> Option<&str> {
         Rule::block => todo!(),
         Rule::statement => todo!(),
         Rule::expr_stmt => Some("an expression statement"),
-        Rule::for_stmt => todo!(),
+        Rule::for_stmt => Some("a for statement"),
         Rule::if_stmt => todo!(),
         Rule::while_stmt => todo!(),
         Rule::return_stmt => todo!(),

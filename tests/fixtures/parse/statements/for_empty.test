@@ -1,0 +1,15 @@
+==INPUT==
+for(;;) {}
+==EXPECTED==
+Program {
+    statements: [
+        For {
+            initializer: None,
+            condition: None,
+            increment: None,
+            body: Block(
+                [],
+            ),
+        },
+    ],
+}

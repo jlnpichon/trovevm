@@ -1,0 +1,32 @@
+==INPUT==
+for(;;x = x+1) {}
+==EXPECTED==
+Program {
+    statements: [
+        For {
+            initializer: None,
+            condition: None,
+            increment: Some(
+                Assign {
+                    target: Variable(
+                        "x",
+                    ),
+                    value: Binary {
+                        op: Add,
+                        lhs: Variable(
+                            "x",
+                        ),
+                        rhs: Literal(
+                            Number(
+                                1.0,
+                            ),
+                        ),
+                    },
+                },
+            ),
+            body: Block(
+                [],
+            ),
+        },
+    ],
+}

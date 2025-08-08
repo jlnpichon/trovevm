@@ -29,7 +29,7 @@ statement = _{
 expr_stmt = { expr ~ SEMICOLON }
 
 for_stmt = {
-    FOR_KW ~ LPAREN ~ (var_decl | expr_stmt | ";") ~ expr? ~ SEMICOLON ~ expr? ~ RPAREN ~ statement
+    FOR_KW ~ LPAREN ~ (var_decl | expr_stmt | SEMICOLON) ~ expr? ~ SEMICOLON ~ expr? ~ RPAREN ~ statement
 }
 
 if_stmt = { IF_KW ~ LPAREN ~ expr ~ RPAREN ~ block ~ (ELSE_KW ~ block)? }
