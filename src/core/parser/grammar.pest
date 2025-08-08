@@ -41,7 +41,7 @@ return_stmt = { RETURN_KW ~ expr ~ SEMICOLON }
 // ---- Expressions ----
 expr = { unary_op? ~ unary_expr ~ (bin_op ~ unary_op? ~ unary_expr)* }
 
-unary_expr = { (Literal | Identifier | String | grouped_expr) ~ call_suffix* }
+unary_expr = { (Literal | Identifier | grouped_expr) ~ call_suffix* }
 
 call_suffix = { LPAREN ~ args? ~ RPAREN }
 
@@ -69,7 +69,7 @@ bin_op = _{
 }
 
 // ---- Literals ----
-Literal =  { INT | BOOL | NULL_KW | HEXADDR }
+Literal =  { INT | BOOL | NULL_KW | String | HEXADDR }
 INT     = @{ MINUS? ~ DIGIT+ }
 BOOL    = @{ "true" | "false" }
 HEXADDR = @{ "0x" ~ HEX_DIGIT+ }
