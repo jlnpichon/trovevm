@@ -8,7 +8,7 @@ use trovevm::cli::{
 
 #[test]
 fn test_parse() -> Result<(), Box<dyn std::error::Error>> {
-    for file in globwalk::glob("tests/fixtures/parse/*.test")? {
+    for file in globwalk::glob("tests/fixtures/parse/**/*.test")? {
         let path = file?.into_path();
         println!("running {:?}", path);
         let fixture = load_fixture_simple(path.clone())?;

@@ -1,0 +1,28 @@
+==INPUT==
+foo(a) == !b;
+==EXPECTED==
+Program {
+    statements: [
+        Expr(
+            Binary {
+                op: Eq,
+                lhs: FnCall {
+                    callee: Variable(
+                        "foo",
+                    ),
+                    args: [
+                        Variable(
+                            "a",
+                        ),
+                    ],
+                },
+                rhs: Unary {
+                    op: Not,
+                    expr: Variable(
+                        "b",
+                    ),
+                },
+            },
+        ),
+    ],
+}

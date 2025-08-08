@@ -1,0 +1,22 @@
+==INPUT==
+fn foo(a, b, c) { }
+==EXPECTED==
+Program {
+    statements: [
+        FnDecl(
+            Function {
+                name: Identifier(
+                    "foo",
+                ),
+                params: [
+                    "a",
+                    "b",
+                    "c",
+                ],
+                body: Block(
+                    [],
+                ),
+            },
+        ),
+    ],
+}

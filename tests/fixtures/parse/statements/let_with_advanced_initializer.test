@@ -1,0 +1,42 @@
+==INPUT==
+let x = foo(x + 2) + 3;
+==EXPECTED==
+Program {
+    statements: [
+        VarDecl(
+            Var {
+                name: Identifier(
+                    "x",
+                ),
+                initializer: Some(
+                    Binary {
+                        op: Add,
+                        lhs: FnCall {
+                            callee: Variable(
+                                "foo",
+                            ),
+                            args: [
+                                Binary {
+                                    op: Add,
+                                    lhs: Variable(
+                                        "x",
+                                    ),
+                                    rhs: Literal(
+                                        Number(
+                                            2.0,
+                                        ),
+                                    ),
+                                },
+                            ],
+                        },
+                        rhs: Literal(
+                            Number(
+                                3.0,
+                            ),
+                        ),
+                    },
+                ),
+            },
+        ),
+    ],
+}

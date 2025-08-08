@@ -1,0 +1,20 @@
+==INPUT==
+2 <= bar;
+==EXPECTED==
+Program {
+    statements: [
+        Expr(
+            Binary {
+                op: Le,
+                lhs: Literal(
+                    Number(
+                        2.0,
+                    ),
+                ),
+                rhs: Variable(
+                    "bar",
+                ),
+            },
+        ),
+    ],
+}

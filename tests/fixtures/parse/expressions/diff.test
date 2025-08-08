@@ -1,0 +1,18 @@
+==INPUT==
+x != y;
+==EXPECTED==
+Program {
+    statements: [
+        Expr(
+            Binary {
+                op: Neq,
+                lhs: Variable(
+                    "x",
+                ),
+                rhs: Variable(
+                    "y",
+                ),
+            },
+        ),
+    ],
+}

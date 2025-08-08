@@ -1,0 +1,41 @@
+==INPUT==
+let a = foo(1, 2) != 3;
+==EXPECTED==
+Program {
+    statements: [
+        VarDecl(
+            Var {
+                name: Identifier(
+                    "a",
+                ),
+                initializer: Some(
+                    Binary {
+                        op: Neq,
+                        lhs: FnCall {
+                            callee: Variable(
+                                "foo",
+                            ),
+                            args: [
+                                Literal(
+                                    Number(
+                                        1.0,
+                                    ),
+                                ),
+                                Literal(
+                                    Number(
+                                        2.0,
+                                    ),
+                                ),
+                            ],
+                        },
+                        rhs: Literal(
+                            Number(
+                                3.0,
+                            ),
+                        ),
+                    },
+                ),
+            },
+        ),
+    ],
+}

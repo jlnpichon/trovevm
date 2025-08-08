@@ -1,0 +1,44 @@
+==INPUT==
+contract Wallet {
+  fn square(x) {
+    return x * x;
+  }
+}
+==EXPECTED==
+Program {
+    statements: [
+        ContractDecl(
+            Contract {
+                name: Identifier(
+                    "Wallet",
+                ),
+                vars: [],
+                funcs: [
+                    Function {
+                        name: Identifier(
+                            "square",
+                        ),
+                        params: [
+                            "x",
+                        ],
+                        body: Block(
+                            [
+                                Return(
+                                    Binary {
+                                        op: Multiply,
+                                        lhs: Variable(
+                                            "x",
+                                        ),
+                                        rhs: Variable(
+                                            "x",
+                                        ),
+                                    },
+                                ),
+                            ],
+                        ),
+                    },
+                ],
+            },
+        ),
+    ],
+}

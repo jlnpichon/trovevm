@@ -1,0 +1,49 @@
+==INPUT==
+fn foo(a, b, c) {
+  print(a + b + c);
+}
+==EXPECTED==
+Program {
+    statements: [
+        FnDecl(
+            Function {
+                name: Identifier(
+                    "foo",
+                ),
+                params: [
+                    "a",
+                    "b",
+                    "c",
+                ],
+                body: Block(
+                    [
+                        Expr(
+                            FnCall {
+                                callee: Variable(
+                                    "print",
+                                ),
+                                args: [
+                                    Binary {
+                                        op: Add,
+                                        lhs: Binary {
+                                            op: Add,
+                                            lhs: Variable(
+                                                "a",
+                                            ),
+                                            rhs: Variable(
+                                                "b",
+                                            ),
+                                        },
+                                        rhs: Variable(
+                                            "c",
+                                        ),
+                                    },
+                                ],
+                            },
+                        ),
+                    ],
+                ),
+            },
+        ),
+    ],
+}

@@ -1,0 +1,26 @@
+==INPUT==
+(a && b) >= 42;
+==EXPECTED==
+Program {
+    statements: [
+        Expr(
+            Binary {
+                op: Ge,
+                lhs: Binary {
+                    op: And,
+                    lhs: Variable(
+                        "a",
+                    ),
+                    rhs: Variable(
+                        "b",
+                    ),
+                },
+                rhs: Literal(
+                    Number(
+                        42.0,
+                    ),
+                ),
+            },
+        ),
+    ],
+}

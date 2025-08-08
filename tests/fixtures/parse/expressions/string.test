@@ -1,0 +1,14 @@
+==INPUT==
+"a string";
+==EXPECTED==
+Program {
+    statements: [
+        Expr(
+            Literal(
+                String(
+                    "a string",
+                ),
+            ),
+        ),
+    ],
+}

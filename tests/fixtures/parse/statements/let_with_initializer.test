@@ -1,0 +1,21 @@
+==INPUT==
+let x = 42;
+==EXPECTED==
+Program {
+    statements: [
+        VarDecl(
+            Var {
+                name: Identifier(
+                    "x",
+                ),
+                initializer: Some(
+                    Literal(
+                        Number(
+                            42.0,
+                        ),
+                    ),
+                ),
+            },
+        ),
+    ],
+}

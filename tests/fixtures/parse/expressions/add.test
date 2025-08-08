@@ -1,0 +1,34 @@
+==INPUT==
+1 + 2 + x + y;
+==EXPECTED==
+Program {
+    statements: [
+        Expr(
+            Binary {
+                op: Add,
+                lhs: Binary {
+                    op: Add,
+                    lhs: Binary {
+                        op: Add,
+                        lhs: Literal(
+                            Number(
+                                1.0,
+                            ),
+                        ),
+                        rhs: Literal(
+                            Number(
+                                2.0,
+                            ),
+                        ),
+                    },
+                    rhs: Variable(
+                        "x",
+                    ),
+                },
+                rhs: Variable(
+                    "y",
+                ),
+            },
+        ),
+    ],
+}

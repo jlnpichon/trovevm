@@ -1,0 +1,30 @@
+==INPUT==
+2 + "test" == false;
+==EXPECTED==
+Program {
+    statements: [
+        Expr(
+            Binary {
+                op: Eq,
+                lhs: Binary {
+                    op: Add,
+                    lhs: Literal(
+                        Number(
+                            2.0,
+                        ),
+                    ),
+                    rhs: Literal(
+                        String(
+                            "test",
+                        ),
+                    ),
+                },
+                rhs: Literal(
+                    Bool(
+                        false,
+                    ),
+                ),
+            },
+        ),
+    ],
+}

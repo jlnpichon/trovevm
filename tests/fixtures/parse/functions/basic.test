@@ -1,0 +1,28 @@
+==INPUT==
+fn foo() { 
+  return 1;
+}
+==EXPECTED==
+Program {
+    statements: [
+        FnDecl(
+            Function {
+                name: Identifier(
+                    "foo",
+                ),
+                params: [],
+                body: Block(
+                    [
+                        Return(
+                            Literal(
+                                Number(
+                                    1.0,
+                                ),
+                            ),
+                        ),
+                    ],
+                ),
+            },
+        ),
+    ],
+}

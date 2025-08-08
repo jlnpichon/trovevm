@@ -1,0 +1,39 @@
+==INPUT==
+!((a + b) * (c - d) && b);
+==EXPECTED==
+Program {
+    statements: [
+        Expr(
+            Unary {
+                op: Not,
+                expr: Binary {
+                    op: And,
+                    lhs: Binary {
+                        op: Multiply,
+                        lhs: Binary {
+                            op: Add,
+                            lhs: Variable(
+                                "a",
+                            ),
+                            rhs: Variable(
+                                "b",
+                            ),
+                        },
+                        rhs: Binary {
+                            op: Substract,
+                            lhs: Variable(
+                                "c",
+                            ),
+                            rhs: Variable(
+                                "d",
+                            ),
+                        },
+                    },
+                    rhs: Variable(
+                        "b",
+                    ),
+                },
+            },
+        ),
+    ],
+}

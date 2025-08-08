@@ -1,0 +1,14 @@
+==INPUT==
+42;
+==EXPECTED==
+Program {
+    statements: [
+        Expr(
+            Literal(
+                Number(
+                    42.0,
+                ),
+            ),
+        ),
+    ],
+}

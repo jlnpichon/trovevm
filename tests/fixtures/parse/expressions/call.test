@@ -1,0 +1,32 @@
+==INPUT==
+foo(a, 2 + 3);
+==EXPECTED==
+Program {
+    statements: [
+        Expr(
+            FnCall {
+                callee: Variable(
+                    "foo",
+                ),
+                args: [
+                    Variable(
+                        "a",
+                    ),
+                    Binary {
+                        op: Add,
+                        lhs: Literal(
+                            Number(
+                                2.0,
+                            ),
+                        ),
+                        rhs: Literal(
+                            Number(
+                                3.0,
+                            ),
+                        ),
+                    },
+                ],
+            },
+        ),
+    ],
+}

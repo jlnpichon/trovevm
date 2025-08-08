@@ -1,0 +1,29 @@
+==INPUT==
+false < foo(1);
+==EXPECTED==
+Program {
+    statements: [
+        Expr(
+            Binary {
+                op: Lt,
+                lhs: Literal(
+                    Bool(
+                        false,
+                    ),
+                ),
+                rhs: FnCall {
+                    callee: Variable(
+                        "foo",
+                    ),
+                    args: [
+                        Literal(
+                            Number(
+                                1.0,
+                            ),
+                        ),
+                    ],
+                },
+            },
+        ),
+    ],
+}

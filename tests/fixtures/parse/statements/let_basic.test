@@ -1,0 +1,15 @@
+==INPUT==
+let x;
+==EXPECTED==
+Program {
+    statements: [
+        VarDecl(
+            Var {
+                name: Identifier(
+                    "x",
+                ),
+                initializer: None,
+            },
+        ),
+    ],
+}

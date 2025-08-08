@@ -1,0 +1,22 @@
+==INPUT==
+true > false;
+==EXPECTED==
+Program {
+    statements: [
+        Expr(
+            Binary {
+                op: Gt,
+                lhs: Literal(
+                    Bool(
+                        true,
+                    ),
+                ),
+                rhs: Literal(
+                    Bool(
+                        false,
+                    ),
+                ),
+            },
+        ),
+    ],
+}
