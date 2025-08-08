@@ -61,8 +61,18 @@ pub fn peek_rule<'i>(pairs: &mut pest::iterators::Pairs<'i, Rule>, expected: Rul
 
 fn var_decl(mut pairs: pest::iterators::Pairs<Rule>) -> Result<Var, PestError> {
     expect_rule(&mut pairs, Rule::LET_KW)?;
-    let name = pairs.next().unwrap().to_string();
-    Ok(Var { name: name.into() })
+
+    let mut initializer = None;
+    let name = pairs.next().unwrap().as_str().to_string();
+
+    if accept_rule(&mut pairs, Rule::EQ).is_some() {
+        initializer = Some(expr(&mut pairs.next().unwrap().into_inner())?);
+    }
+
+    Ok(Var {
+        name: name.into(),
+        initializer,
+    })
 }
 
 fn params(pairs: &mut pest::iterators::Pairs<Rule>) -> Result<Vec<String>, PestError> {

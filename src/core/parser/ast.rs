@@ -33,9 +33,10 @@ pub struct Contract {
     pub funcs: Vec<Function>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Var {
     pub name: Identifier,
+    pub initializer: Option<Expr>,
 }
 
 #[derive(Debug, Clone)]
