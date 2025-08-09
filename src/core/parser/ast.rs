@@ -27,6 +27,10 @@ pub enum Statement {
         increment: Option<Expr>,
         body: Box<Statement>,
     },
+    While {
+        condition: Expr,
+        body: Box<Statement>,
+    },
 }
 
 #[derive(Debug, Clone)]

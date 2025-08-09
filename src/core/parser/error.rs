@@ -39,7 +39,7 @@ fn rule_to_message(rule: &Rule) -> Option<&str> {
         Rule::expr_stmt => Some("an expression statement"),
         Rule::for_stmt => Some("a for statement"),
         Rule::if_stmt => todo!(),
-        Rule::while_stmt => todo!(),
+        Rule::while_stmt => Some("a while statement"),
         Rule::return_stmt => todo!(),
         Rule::expr => todo!(),
         _ => None,

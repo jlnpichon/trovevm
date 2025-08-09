@@ -174,6 +174,17 @@ fn for_statement(mut pairs: pest::iterators::Pairs<Rule>) -> Result<Statement, P
     })
 }
 
+fn while_statement(mut pairs: pest::iterators::Pairs<Rule>) -> Result<Statement, PestError> {
+    expect_rule(&mut pairs, Rule::WHILE_KW)?;
+
+    expect_rule(&mut pairs, Rule::LPAREN)?;
+    let condition = expr(&mut pairs.next().unwrap().into_inner())?;
+    expect_rule(&mut pairs, Rule::RPAREN)?;
+    let body = block(pairs.next().unwrap().into_inner())?.into();
+
+    Ok(Statement::While { condition, body })
+}
+
 fn statement(pair: pest::iterators::Pair<Rule>) -> Result<Statement, PestError> {
     Ok(match pair.as_rule() {
         Rule::var_decl => Statement::VarDecl(var_decl(pair.into_inner())?),
@@ -181,7 +192,7 @@ fn statement(pair: pest::iterators::Pair<Rule>) -> Result<Statement, PestError> 
         Rule::for_stmt => for_statement(pair.into_inner())?,
         Rule::if_stmt => if_statement(pair.into_inner())?,
         Rule::return_stmt => return_statement(pair.into_inner())?,
-        Rule::while_stmt => todo!(),
+        Rule::while_stmt => while_statement(pair.into_inner())?,
         Rule::block => block(pair.into_inner())?,
         rule => {
             return Err(Box::new(pest::error::Error::new_from_span(
