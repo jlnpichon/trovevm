@@ -1,0 +1,50 @@
+==INPUT==
+while(a!=b) {
+  a = a+1;
+  "a string";
+}
+==EXPECTED==
+Program {
+    statements: [
+        While {
+            condition: Binary {
+                op: Neq,
+                lhs: Variable(
+                    "a",
+                ),
+                rhs: Variable(
+                    "b",
+                ),
+            },
+            body: Block(
+                [
+                    Expr(
+                        Assign {
+                            target: Variable(
+                                "a",
+                            ),
+                            value: Binary {
+                                op: Add,
+                                lhs: Variable(
+                                    "a",
+                                ),
+                                rhs: Literal(
+                                    Number(
+                                        1.0,
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                    Expr(
+                        Literal(
+                            String(
+                                "a string",
+                            ),
+                        ),
+                    ),
+                ],
+            ),
+        },
+    ],
+}
