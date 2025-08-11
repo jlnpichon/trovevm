@@ -1,7 +1,7 @@
 use trovevm::core::vm::{Opcode, Program, RuntimeError, VM, Value};
 
-fn run_program(bytecode: &[Opcode], constants: Vec<Value>) -> (VM, Program) {
-    let program = Program::new(bytecode, constants);
+fn run_program<const N: usize>(bytecode: &[Opcode; N], constants: Vec<Value>) -> (VM, Program) {
+    let program = Program::from((bytecode, constants));
     let mut vm = VM::new();
     vm.run(&program).expect("run the program");
     (vm, program)
@@ -124,7 +124,7 @@ fn test_pop() {
 
 #[test]
 fn test_invalid_constant_index() {
-    let program = Program::new(&[Opcode::Push(100)], vec![Value::Number(1.0)]);
+    let program = Program::from((&[Opcode::Push(100)], vec![Value::Number(1.0)]));
     let mut vm = VM::new();
     let result = vm.run(&program);
     assert!(matches!(
@@ -135,10 +135,10 @@ fn test_invalid_constant_index() {
 
 #[test]
 fn test_division_by_zero() {
-    let program = Program::new(
+    let program = Program::from((
         &[Opcode::Push(0), Opcode::Push(1), Opcode::Div],
         vec![Value::Number(1.0), Value::Number(0.0)],
-    );
+    ));
     let mut vm = VM::new();
     let result = vm.run(&program);
     assert!(matches!(result, Err(RuntimeError::DivisionByZero)));

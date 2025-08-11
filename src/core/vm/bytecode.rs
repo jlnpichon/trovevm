@@ -27,20 +27,27 @@ pub enum Opcode {
     Push(usize),
 
     Jump(usize),
+
+    Return,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Program {
     bytecode: Vec<Opcode>,
     constants: Vec<Value>,
 }
 
 impl Program {
-    pub fn new(bytecode: &[Opcode], constants: Vec<Value>) -> Self {
-        Self {
-            bytecode: bytecode.to_vec(),
-            constants,
-        }
+    pub fn new() -> Self {
+        Program::default()
+    }
+
+    pub fn emit_opcode(&mut self, opcode: Opcode) {
+        self.bytecode.push(opcode);
+    }
+
+    pub fn emit_return(&mut self) {
+        self.bytecode.push(Opcode::Return);
     }
 
     pub fn len(&self) -> usize {
@@ -64,6 +71,15 @@ impl Program {
 
     fn write(&mut self, opcode: Opcode) {
         todo!()
+    }
+}
+
+impl<const N: usize> From<(&[Opcode; N], Vec<Value>)> for Program {
+    fn from((bytecode, constants): (&[Opcode; N], Vec<Value>)) -> Self {
+        Self {
+            bytecode: bytecode.to_vec(),
+            constants,
+        }
     }
 }
 

@@ -104,6 +104,7 @@ impl VM {
                     self.push(value.clone());
                 }
                 Opcode::Jump(_) => todo!(),
+                Opcode::Return => todo!(),
             }
             self.ip += 1;
         }
