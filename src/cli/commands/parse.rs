@@ -1,7 +1,5 @@
-use crate::{
-    cli::input::{InputError, InputSource},
-    core::{self, parser::ast::Program, parser::error::ParseErrorWithContext},
-};
+use crate::cli::input::{InputError, InputSource};
+use crate::core::{self, ast::Program, parser::error::ParseErrorWithContext};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ParseCommandError {

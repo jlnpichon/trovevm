@@ -47,6 +47,10 @@ impl Program {
         self.bytecode.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn constant_get(&self, index: usize) -> Option<&Value> {
         self.constants.get(index)
     }

@@ -1,11 +1,8 @@
 use pest::Parser as PestParser;
 use pest_derive::Parser;
 
-use super::{
-    ast::{Contract, Function, Identifier, Program, Statement, Var},
-    error::ParseErrorWithContext,
-    expr::expr,
-};
+use super::{error::ParseErrorWithContext, expr::expr};
+use crate::core::ast::{Contract, Function, Identifier, Program, Statement, Var};
 
 pub type PestError = Box<pest::error::Error<Rule>>;
 
@@ -52,7 +49,7 @@ pub fn accept_rule<'i>(
     None
 }
 
-pub fn peek_rule<'i>(pairs: &mut pest::iterators::Pairs<'i, Rule>, expected: Rule) -> bool {
+pub fn peek_rule(pairs: &mut pest::iterators::Pairs<'_, Rule>, expected: Rule) -> bool {
     pairs
         .peek()
         .map(|p| p.as_rule() == expected)

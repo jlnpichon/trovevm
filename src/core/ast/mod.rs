@@ -1,4 +1,6 @@
-use super::expr::Expr;
+pub use expr::{Expr, Op, UnaryOp};
+
+pub mod expr;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Identifier(pub String);
