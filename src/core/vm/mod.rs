@@ -78,6 +78,7 @@ impl VM {
                 Opcode::Sub => self.apply_binop(Op::Sub)?,
                 Opcode::Mul => self.apply_binop(Op::Mul)?,
                 Opcode::Div => self.apply_binop(Op::Div)?,
+                Opcode::Mod => self.apply_binop(Op::Mod)?,
                 Opcode::Neg => {
                     let lhs = self.pop()?;
                     let value = lhs.try_apply(Op::Neg, None)?;

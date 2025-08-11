@@ -17,14 +17,14 @@ pub enum Expr {
         expr: Box<Expr>,
     },
     Binary {
-        op: Op,
+        op: BinaryOp,
         lhs: Box<Expr>,
         rhs: Box<Expr>,
     },
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum Op {
+pub enum BinaryOp {
     Add,
     Substract,
     Multiply,
@@ -48,9 +48,17 @@ pub enum UnaryOp {
     Minus,
 }
 
-impl Op {
+impl BinaryOp {
     pub fn is_cmp(&self) -> bool {
-        matches!(self, Op::Gt | Op::Ge | Op::Lt | Op::Le | Op::Eq | Op::Neq)
+        matches!(
+            self,
+            BinaryOp::Gt
+                | BinaryOp::Ge
+                | BinaryOp::Lt
+                | BinaryOp::Le
+                | BinaryOp::Eq
+                | BinaryOp::Neq
+        )
     }
 }
 

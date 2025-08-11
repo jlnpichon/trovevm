@@ -1,6 +1,6 @@
 use pest::pratt_parser::PrattParser;
 
-use crate::core::ast::{Expr, Literal, Op, UnaryOp};
+use crate::core::ast::{BinaryOp, Expr, Literal, UnaryOp};
 
 use super::grammar::{PestError, Rule, expect_rule};
 
@@ -34,22 +34,22 @@ impl From<Rule> for UnaryOp {
     }
 }
 
-impl From<Rule> for Op {
+impl From<Rule> for BinaryOp {
     fn from(value: Rule) -> Self {
         match value {
-            Rule::EQEQ => Op::Eq,
-            Rule::NEQ => Op::Neq,
-            Rule::GT => Op::Gt,
-            Rule::GE => Op::Ge,
-            Rule::LT => Op::Lt,
-            Rule::LE => Op::Le,
-            Rule::AND => Op::And,
-            Rule::OR => Op::Or,
-            Rule::PLUS => Op::Add,
-            Rule::MINUS => Op::Substract,
-            Rule::SLASH => Op::Divide,
-            Rule::STAR => Op::Multiply,
-            Rule::MODULO => Op::Modulo,
+            Rule::EQEQ => BinaryOp::Eq,
+            Rule::NEQ => BinaryOp::Neq,
+            Rule::GT => BinaryOp::Gt,
+            Rule::GE => BinaryOp::Ge,
+            Rule::LT => BinaryOp::Lt,
+            Rule::LE => BinaryOp::Le,
+            Rule::AND => BinaryOp::And,
+            Rule::OR => BinaryOp::Or,
+            Rule::PLUS => BinaryOp::Add,
+            Rule::MINUS => BinaryOp::Substract,
+            Rule::SLASH => BinaryOp::Divide,
+            Rule::STAR => BinaryOp::Multiply,
+            Rule::MODULO => BinaryOp::Modulo,
             _ => unreachable!(),
         }
     }
@@ -176,7 +176,7 @@ pub fn expr(pairs: &mut pest::iterators::Pairs<Rule>) -> Result<Expr, PestError>
                 Ok(Expr::Binary {
                     lhs: lhs?.into(),
                     rhs: rhs?.into(),
-                    op: Op::from(rule),
+                    op: BinaryOp::from(rule),
                 })
             }
         })

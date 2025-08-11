@@ -1,3 +1,5 @@
+use crate::core::ast::Literal;
+
 use super::RuntimeError;
 
 #[derive(Debug, Clone)]
@@ -5,6 +7,7 @@ pub enum Value {
     Number(f64),
     String(String),
     Bool(bool),
+    Null,
 }
 
 #[derive(Debug, Clone)]
@@ -13,6 +16,7 @@ pub enum Op {
     Sub,
     Mul,
     Div,
+    Mod,
     Neg,
 
     Lt,
@@ -42,6 +46,7 @@ impl Value {
                     Ok(Value::Number(lhs / rhs))
                 }
             }
+            (Value::Number(lhs), Some(Value::Number(rhs)), Op::Mod) => Ok(Value::Number(lhs % rhs)),
             (Value::Number(lhs), Some(Value::Number(rhs)), Op::Lt) => Ok(Value::Bool(*lhs < *rhs)),
             (Value::Number(lhs), Some(Value::Number(rhs)), Op::Le) => Ok(Value::Bool(*lhs <= *rhs)),
             (Value::Number(lhs), Some(Value::Number(rhs)), Op::Gt) => Ok(Value::Bool(*lhs > *rhs)),
@@ -89,6 +94,7 @@ impl Value {
             Value::Number(n) => n.abs() >= f64::EPSILON,
             Value::String(s) => !s.is_empty(),
             Value::Bool(b) => *b,
+            Value::Null => false,
         }
     }
 }
@@ -99,7 +105,19 @@ impl PartialEq for Value {
             (Value::Number(a), Value::Number(b)) => (a - b).abs() < f64::EPSILON,
             (Value::String(a), Value::String(b)) => a == b,
             (Value::Bool(a), Value::Bool(b)) => a == b,
+            (Value::Null, Value::Null) => true,
             _ => false,
+        }
+    }
+}
+
+impl From<&Literal> for Value {
+    fn from(literal: &Literal) -> Self {
+        match literal {
+            Literal::Number(n) => Value::Number(*n),
+            Literal::String(s) => Value::String(s.to_string()),
+            Literal::Bool(b) => Value::Bool(*b),
+            Literal::Null => Value::Null,
         }
     }
 }

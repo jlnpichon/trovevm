@@ -11,6 +11,7 @@ pub enum Opcode {
     Sub,
     Mul,
     Div,
+    Mod,
     Neg,
 
     Lt,
@@ -50,6 +51,17 @@ impl Program {
         self.bytecode.push(Opcode::Return);
     }
 
+    pub fn emit_constant(&mut self, value: Value) {
+        // Constant already exists? Reuse it
+        if let Some(index) = self.constants.iter().position(|c| *c == value) {
+            self.emit_opcode(Opcode::Push(index));
+        } else {
+            self.constants.push(value);
+            let index = self.constants.len() - 1;
+            self.emit_opcode(Opcode::Push(index));
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.bytecode.len()
     }
@@ -69,8 +81,8 @@ impl Program {
         todo!()
     }
 
-    fn write(&mut self, opcode: Opcode) {
-        todo!()
+    pub fn as_slices(&self) -> (&[Opcode], &[Value]) {
+        (&self.bytecode, &self.constants)
     }
 }
 

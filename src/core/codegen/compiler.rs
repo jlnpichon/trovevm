@@ -1,7 +1,30 @@
-use crate::core::ast::{Contract, Expr, Function, Literal, Statement, Var, Visitor};
+use crate::core::{
+    ast::{BinaryOp, Contract, Expr, Function, Literal, Statement, UnaryOp, Var, Visitor},
+    vm::{Opcode, Program, Value},
+};
 
-#[derive(Debug, Clone)]
-pub struct Compiler {}
+#[derive(Debug, thiserror::Error)]
+pub enum CompileError {}
+
+#[derive(Debug, Clone, Default)]
+pub struct Compiler {
+    program: Program,
+}
+
+impl Compiler {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Compiler {
+    pub fn compile(mut self, statements: &[Statement]) -> Result<Program, CompileError> {
+        for statement in statements {
+            self.visit_statement(statement);
+        }
+        Ok(self.program)
+    }
+}
 
 impl Visitor for Compiler {
     fn visit_statement(&mut self, s: &Statement) {
@@ -73,21 +96,36 @@ impl Visitor for Compiler {
             }
             Expr::Unary { op, expr } => {
                 expr.accept(self);
+                match op {
+                    UnaryOp::Not => todo!(),
+                    UnaryOp::Minus => self.program.emit_opcode(Opcode::Neg),
+                }
             }
             Expr::Binary { op, lhs, rhs } => {
                 lhs.accept(self);
                 rhs.accept(self);
+                match op {
+                    BinaryOp::Add => self.program.emit_opcode(Opcode::Add),
+                    BinaryOp::Substract => self.program.emit_opcode(Opcode::Sub),
+                    BinaryOp::Multiply => self.program.emit_opcode(Opcode::Mul),
+                    BinaryOp::Divide => self.program.emit_opcode(Opcode::Div),
+                    BinaryOp::Modulo => self.program.emit_opcode(Opcode::Mod),
+                    BinaryOp::Or => self.program.emit_opcode(Opcode::Or),
+                    BinaryOp::And => self.program.emit_opcode(Opcode::And),
+                    BinaryOp::Gt => self.program.emit_opcode(Opcode::Gt),
+                    BinaryOp::Ge => self.program.emit_opcode(Opcode::Ge),
+                    BinaryOp::Lt => self.program.emit_opcode(Opcode::Lt),
+                    BinaryOp::Le => self.program.emit_opcode(Opcode::Le),
+                    BinaryOp::Eq => self.program.emit_opcode(Opcode::Eq),
+                    BinaryOp::Neq => self.program.emit_opcode(Opcode::Neq),
+                }
             }
         }
     }
 
     fn visit_literal(&mut self, l: &Literal) {
-        match l {
-            Literal::Number(_) => todo!(),
-            Literal::String(_) => todo!(),
-            Literal::Bool(_) => todo!(),
-            Literal::Null => todo!(),
-        }
+        let value = Value::from(l);
+        self.program.emit_constant(value);
     }
 
     fn visit_var_decl(&mut self, v: &Var) {

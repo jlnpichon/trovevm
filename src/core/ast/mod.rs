@@ -1,7 +1,7 @@
 pub mod expr;
 pub mod visitor;
 
-pub use expr::{Expr, Op, UnaryOp};
+pub use expr::{BinaryOp, Expr, UnaryOp};
 pub use visitor::Visitor;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
