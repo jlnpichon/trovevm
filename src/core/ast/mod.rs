@@ -1,6 +1,8 @@
-pub use expr::{Expr, Op, UnaryOp};
-
 pub mod expr;
+pub mod visitor;
+
+pub use expr::{Expr, Op, UnaryOp};
+pub use visitor::Visitor;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Identifier(pub String);
@@ -61,6 +63,12 @@ pub struct Function {
     pub name: Identifier,
     pub params: Vec<String>,
     pub body: Box<Statement>,
+}
+
+impl Statement {
+    pub fn accept<V: Visitor>(&self, visitor: &mut V) {
+        visitor.visit_statement(self)
+    }
 }
 
 impl From<&str> for Identifier {

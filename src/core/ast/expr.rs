@@ -1,4 +1,4 @@
-use super::Literal;
+use super::{Literal, Visitor};
 
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -51,5 +51,11 @@ pub enum UnaryOp {
 impl Op {
     pub fn is_cmp(&self) -> bool {
         matches!(self, Op::Gt | Op::Ge | Op::Lt | Op::Le | Op::Eq | Op::Neq)
+    }
+}
+
+impl Expr {
+    pub fn accept<V: Visitor>(&self, visitor: &mut V) {
+        visitor.visit_expr(self)
     }
 }
