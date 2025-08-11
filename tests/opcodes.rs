@@ -1,8 +1,4 @@
-use trovevm::core::{
-    bytecode::Opcode,
-    value::Value,
-    vm::{Program, RuntimeError, VM},
-};
+use trovevm::core::vm::{Opcode, Program, RuntimeError, VM, Value};
 
 fn run_program(bytecode: &[Opcode], constants: Vec<Value>) -> (VM, Program) {
     let program = Program::new(bytecode, constants);

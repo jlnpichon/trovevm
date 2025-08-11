@@ -1,17 +1,17 @@
-use super::{
-    bytecode::Opcode,
-    value::{Op, Value},
-};
+pub mod bytecode;
+pub mod value;
+
+// Re-exports
+pub use bytecode::Opcode;
+pub use bytecode::Program;
+pub use value::Value;
+
+use value::Op;
 
 #[derive(Debug)]
 pub struct VM {
     stack: Vec<Value>,
     ip: usize,
-}
-
-pub struct Program {
-    bytecode: Vec<Opcode>,
-    constants: Vec<Value>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -28,22 +28,6 @@ pub enum RuntimeError {
     DivisionByZero,
     #[error("invalid operation '{0:?}' on string")]
     InvalidStringOperation(Op),
-}
-
-impl Program {
-    pub fn new(bytecode: &[Opcode], constants: Vec<Value>) -> Self {
-        Self {
-            bytecode: bytecode.to_vec(),
-            constants,
-        }
-    }
-
-    pub fn to_bytes(&self) -> Vec<u8> {
-        match self.bytecode {
-            _ => todo!(),
-        };
-        todo!()
-    }
 }
 
 impl VM {
@@ -81,8 +65,8 @@ impl VM {
     pub fn run(&mut self, program: &Program) -> Result<(), RuntimeError> {
         self.ip = 0;
 
-        while self.ip < program.bytecode.len() {
-            let opcode = &program.bytecode[self.ip];
+        while self.ip < program.len() {
+            let opcode = &program[self.ip];
             match opcode {
                 Opcode::Add => self.apply_binop(Op::Add)?,
                 Opcode::Sub => self.apply_binop(Op::Sub)?,
@@ -109,8 +93,7 @@ impl VM {
                 }
                 Opcode::Push(index) => {
                     let value = program
-                        .constants
-                        .get(*index)
+                        .constant_get(*index)
                         .ok_or(RuntimeError::InvalidConstantIndex(*index))?;
                     self.push(value.clone());
                 }
@@ -119,21 +102,5 @@ impl VM {
             self.ip += 1;
         }
         Ok(())
-    }
-}
-
-impl Program {
-    fn write(&mut self, opcode: Opcode) {
-        todo!()
-    }
-}
-
-impl<'a> IntoIterator for &'a Program {
-    type Item = &'a Opcode;
-
-    type IntoIter = std::slice::Iter<'a, Opcode>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.bytecode.iter()
     }
 }
