@@ -94,10 +94,13 @@ impl Compiler {
     }
 
     fn resolve_local(&self, name: &str) -> Result<usize, CompileError> {
-        for (index, local) in self.locals.iter().rev().enumerate() {
+        for (i_rev, local) in self.locals.iter().rev().enumerate() {
             if name == local.name {
                 match local.depth {
-                    Some(_) => return Ok(index),
+                    Some(_) => {
+                        let index = self.locals.len() - 1 - i_rev;
+                        return Ok(index);
+                    }
                     None => return Err(CompileError::VariableInOwnInitializer),
                 }
             }
@@ -187,9 +190,20 @@ impl Visitor for Compiler {
                 }
             }
             Expr::Assign { target, value } => {
-                target.accept(self);
                 value.accept(self);
-                self.program.emit_opcode(Opcode::SetGlobal);
+
+                if let Expr::Variable(name) = target.as_ref() {
+                    if self.scope_depth == 0 {
+                        let index = self.program.define_constant(Value::String(name.clone()));
+                        self.program.emit_opcode(Opcode::SetGlobal(index));
+                    } else {
+                        let index = self.resolve_local(name).expect("resolve_local");
+                        println!("{:?}", self.locals);
+                        self.program.emit_opcode(Opcode::SetLocal(index));
+                    }
+                } else {
+                    panic!("Unsupported assignment target {target:?}");
+                }
             }
             Expr::FnCall { callee, args } => {
                 callee.accept(self);

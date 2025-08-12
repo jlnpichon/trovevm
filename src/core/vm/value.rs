@@ -105,6 +105,13 @@ impl Value {
             _ => None,
         }
     }
+
+    pub fn as_number(&self) -> Option<f64> {
+        match self {
+            Value::Number(n) => Some(*n),
+            _ => None,
+        }
+    }
 }
 
 impl PartialEq for Value {

@@ -138,19 +138,6 @@ impl VM {
                     let value = self.pop()?;
                     self.globals.insert(name, value);
                 }
-                Opcode::SetGlobal => {
-                    let value = self.pop()?;
-                    let name = self
-                        .pop()?
-                        .as_string()
-                        .ok_or(RuntimeError::TypeMismatch)?
-                        .clone();
-                    if let Some(v) = self.globals.get_mut(&name) {
-                        *v = value;
-                    } else {
-                        return Err(RuntimeError::UndefinedVariable(name));
-                    }
-                }
                 Opcode::GetGlobal(index) => {
                     let name = program
                         .constant_get(*index)
@@ -160,6 +147,20 @@ impl VM {
                         .clone();
                     if let Some(value) = self.globals.get(&name) {
                         self.push(value.clone());
+                    } else {
+                        return Err(RuntimeError::UndefinedVariable(name));
+                    }
+                }
+                Opcode::SetGlobal(index) => {
+                    let value = self.pop()?;
+                    let name = program
+                        .constant_get(*index)
+                        .ok_or(RuntimeError::InvalidConstantIndex(*index))?
+                        .as_string()
+                        .ok_or(RuntimeError::TypeMismatch)?
+                        .clone();
+                    if let Some(v) = self.globals.get_mut(&name) {
+                        *v = value;
                     } else {
                         return Err(RuntimeError::UndefinedVariable(name));
                     }
