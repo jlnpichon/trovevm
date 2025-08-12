@@ -1,6 +1,8 @@
 pub mod bytecode;
 pub mod value;
 
+use std::collections::HashMap;
+
 // Re-exports
 pub use bytecode::Opcode;
 pub use bytecode::Program;
@@ -12,6 +14,7 @@ use value::Op;
 pub struct VM {
     stack: Vec<Value>,
     ip: usize,
+    globals: HashMap<String, Value>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -28,6 +31,8 @@ pub enum RuntimeError {
     DivisionByZero,
     #[error("invalid operation '{0:?}' on string")]
     InvalidStringOperation(Op),
+    #[error("undefined variable '{0:?}'")]
+    UndefinedVariable(String),
 }
 
 impl Default for VM {
@@ -41,6 +46,7 @@ impl VM {
         Self {
             stack: Vec::with_capacity(1024),
             ip: 0,
+            globals: HashMap::new(),
         }
     }
 
@@ -104,6 +110,44 @@ impl VM {
                         .ok_or(RuntimeError::InvalidConstantIndex(*index))?;
                     self.push(value.clone());
                 }
+
+                Opcode::DefineGlobal(index) => {
+                    let name = program
+                        .constant_get(*index)
+                        .ok_or(RuntimeError::InvalidConstantIndex(*index))?
+                        .as_string()
+                        .ok_or(RuntimeError::TypeMismatch)?
+                        .clone();
+                    let value = self.pop()?;
+                    self.globals.insert(name, value);
+                }
+                Opcode::SetGlobal => {
+                    let value = self.pop()?;
+                    let name = self
+                        .pop()?
+                        .as_string()
+                        .ok_or(RuntimeError::TypeMismatch)?
+                        .clone();
+                    if let Some(v) = self.globals.get_mut(&name) {
+                        *v = value;
+                    } else {
+                        return Err(RuntimeError::UndefinedVariable(name));
+                    }
+                }
+                Opcode::GetGlobal(index) => {
+                    let name = program
+                        .constant_get(*index)
+                        .ok_or(RuntimeError::InvalidConstantIndex(*index))?
+                        .as_string()
+                        .ok_or(RuntimeError::TypeMismatch)?
+                        .clone();
+                    if let Some(value) = self.globals.get(&name) {
+                        self.push(value.clone());
+                    } else {
+                        return Err(RuntimeError::UndefinedVariable(name));
+                    }
+                }
+
                 Opcode::Jump(_) => todo!(),
                 Opcode::Return => todo!(),
             }

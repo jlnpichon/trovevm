@@ -1,11 +1,18 @@
 use trovevm::core::{
-    ast::{BinaryOp, Expr, Literal, Statement},
+    ast::{BinaryOp, Expr, Literal, Statement, Var},
     codegen::Compiler,
     vm::{Opcode, Program, Value},
 };
 
 fn make_stmt_expr(expr: Expr) -> Statement {
     Statement::Expr(expr)
+}
+
+fn make_var_decl(name: &str, initializer: Option<Expr>) -> Statement {
+    Statement::VarDecl(Var {
+        name: name.into(),
+        initializer,
+    })
 }
 
 fn make_number_expr(n: f64) -> Expr {
@@ -47,7 +54,6 @@ fn assert_program(program: &Program, expected_bytecode: &[Opcode], expected_cons
 fn run_compiler(statements: &[Statement], bytecode: &[Opcode], constants: &[Value]) {
     let compiler = Compiler::new();
     let program = compiler.compile(statements).expect("compile ast");
-    println!("{program:#?}");
     assert_program(&program, bytecode, constants);
 }
 
@@ -105,5 +111,16 @@ fn test_compile_simple_addition() {
         &[statement],
         &[Opcode::Push(0), Opcode::Push(1), Opcode::Add],
         &[Value::Number(1.0), Value::Number(2.0)],
+    );
+}
+
+#[test]
+fn test_var_decl() {
+    let statement = make_var_decl("foo", Some(make_number_expr(42.0)));
+
+    run_compiler(
+        &[statement],
+        &[Opcode::Push(0), Opcode::DefineGlobal(1)],
+        &[Value::Number(42.0), Value::String("foo".into())],
     );
 }

@@ -1,7 +1,6 @@
-use std::{
-    ops::{Deref, Index},
-    slice::SliceIndex,
-};
+use std::ops::Index;
+
+use crate::core::ast::Identifier;
 
 use super::Value;
 
@@ -27,6 +26,10 @@ pub enum Opcode {
     Pop,
     Push(usize),
 
+    DefineGlobal(usize),
+    GetGlobal(usize),
+    SetGlobal,
+
     Jump(usize),
 
     Return,
@@ -51,15 +54,29 @@ impl Program {
         self.bytecode.push(Opcode::Return);
     }
 
-    pub fn emit_constant(&mut self, value: Value) {
-        // Constant already exists? Reuse it
+    pub fn emit_null(&mut self) {
+        let index = self.define_constant(Value::Null);
+        self.bytecode.push(Opcode::Push(index));
+    }
+
+    // Constant already exists? Reuse it
+    pub fn define_constant(&mut self, value: Value) -> usize {
         if let Some(index) = self.constants.iter().position(|c| *c == value) {
-            self.emit_opcode(Opcode::Push(index));
+            index
         } else {
             self.constants.push(value);
-            let index = self.constants.len() - 1;
-            self.emit_opcode(Opcode::Push(index));
+            self.constants.len() - 1
         }
+    }
+
+    pub fn emit_constant(&mut self, value: Value) {
+        let index = self.define_constant(value);
+        self.emit_opcode(Opcode::Push(index));
+    }
+
+    pub fn define_global(&mut self, name: &Identifier) {
+        let index = self.define_constant(Value::String(name.to_string()));
+        self.emit_opcode(Opcode::DefineGlobal(index));
     }
 
     pub fn len(&self) -> usize {

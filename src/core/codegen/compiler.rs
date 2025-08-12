@@ -83,10 +83,14 @@ impl Visitor for Compiler {
     fn visit_expr(&mut self, e: &Expr) {
         match e {
             Expr::Literal(literal) => self.visit_literal(literal),
-            Expr::Variable(_) => todo!(),
+            Expr::Variable(var) => {
+                let index = self.program.define_constant(Value::String(var.clone()));
+                self.program.emit_opcode(Opcode::GetGlobal(index));
+            }
             Expr::Assign { target, value } => {
                 target.accept(self);
                 value.accept(self);
+                self.program.emit_opcode(Opcode::SetGlobal);
             }
             Expr::FnCall { callee, args } => {
                 callee.accept(self);
@@ -131,7 +135,10 @@ impl Visitor for Compiler {
     fn visit_var_decl(&mut self, v: &Var) {
         if let Some(initializer) = &v.initializer {
             initializer.accept(self);
+        } else {
+            self.program.emit_null();
         }
+        self.program.define_global(&v.name);
     }
 
     fn visit_contract_decl(&mut self, c: &Contract) {

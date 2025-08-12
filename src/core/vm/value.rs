@@ -33,6 +33,7 @@ pub enum Op {
 fn approx_eq(a: f64, b: f64) -> bool {
     (a - b).abs() < f64::EPSILON
 }
+
 impl Value {
     pub fn try_apply(&self, op: Op, rhs: Option<&Value>) -> Result<Value, RuntimeError> {
         match (self, rhs, op) {
@@ -95,6 +96,13 @@ impl Value {
             Value::String(s) => !s.is_empty(),
             Value::Bool(b) => *b,
             Value::Null => false,
+        }
+    }
+
+    pub fn as_string(&self) -> Option<&String> {
+        match self {
+            Value::String(s) => Some(s),
+            _ => None,
         }
     }
 }

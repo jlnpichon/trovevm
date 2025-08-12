@@ -50,12 +50,14 @@ fn test_sub_mul_div() {
         vec![Value::Number(5.0), Value::Number(2.0), Value::Number(3.0)],
     );
     assert_stack_top(&vm, &Value::Number(3.0));
+    assert_eq!(vm.ip(), 7);
 }
 
 #[test]
 fn test_neg() {
     let (vm, _) = run_program(&[Opcode::Push(0), Opcode::Neg], vec![Value::Number(5.0)]);
     assert_stack_top(&vm, &Value::Number(-5.0));
+    assert_eq!(vm.ip(), 2);
 }
 
 #[test]
@@ -83,6 +85,7 @@ fn test_comparisons() {
         ],
         vec![Value::Number(1.0), Value::Number(2.0)],
     );
+    assert_eq!(vm.ip(), 18);
 
     let expected_results = [
         Value::Bool(true),
@@ -111,6 +114,7 @@ fn test_logical_ops() {
         ],
         vec![Value::Bool(true), Value::Bool(false)],
     );
+    assert_eq!(vm.ip(), 6);
 
     assert_eq!(vm.pop().unwrap(), Value::Bool(true));
     assert_eq!(vm.pop().unwrap(), Value::Bool(false));
@@ -142,4 +146,25 @@ fn test_division_by_zero() {
     let mut vm = VM::new();
     let result = vm.run(&program);
     assert!(matches!(result, Err(RuntimeError::DivisionByZero)));
+}
+
+#[test]
+fn test_global_var() {
+    let (vm, _) = run_program(
+        &[
+            Opcode::Push(2),         // Null
+            Opcode::DefineGlobal(0), // foo = Null
+            Opcode::Push(0),         // foo
+            Opcode::Push(1),         // 42
+            Opcode::SetGlobal,       // foo = 42
+            Opcode::GetGlobal(0),
+        ],
+        vec![
+            Value::String("foo".into()),
+            Value::Number(42.0),
+            Value::Null,
+        ],
+    );
+    assert_stack_top(&vm, &Value::Number(42.0));
+    assert_eq!(vm.ip(), 6);
 }

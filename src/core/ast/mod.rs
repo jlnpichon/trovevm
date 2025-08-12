@@ -1,6 +1,8 @@
 pub mod expr;
 pub mod visitor;
 
+use std::ops::Deref;
+
 pub use expr::{BinaryOp, Expr, UnaryOp};
 pub use visitor::Visitor;
 
@@ -63,6 +65,14 @@ pub struct Function {
     pub name: Identifier,
     pub params: Vec<String>,
     pub body: Box<Statement>,
+}
+
+impl Deref for Identifier {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 impl Statement {
