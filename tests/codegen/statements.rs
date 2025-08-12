@@ -1,6 +1,6 @@
 use trovevm::core::{
     ast::{BinaryOp, Expr, Literal, Statement, Var},
-    codegen::Compiler,
+    codegen::compile,
     vm::{Opcode, Program, Value},
 };
 
@@ -52,8 +52,7 @@ fn assert_program(program: &Program, expected_bytecode: &[Opcode], expected_cons
 }
 
 fn run_compiler(statements: &[Statement], bytecode: &[Opcode], constants: &[Value]) {
-    let compiler = Compiler::new();
-    let program = compiler.compile(statements).expect("compile ast");
+    let program = compile(statements).expect("compile ast");
     assert_program(&program, bytecode, constants);
 }
 

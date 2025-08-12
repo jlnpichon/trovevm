@@ -1,15 +1,15 @@
 mod cli;
 mod core;
 
+use anyhow::Result;
 use ariadne::Source;
 use cli::{
     Args, Config, ConfigCommand,
-    commands::{self, ParseCommandError},
+    commands::{self, CompileCommandError, ParseCommandError},
     init_logging,
 };
 
 use clap::Parser;
-use miette::Result;
 
 fn main() -> Result<()> {
     let cli = Args::parse();
@@ -18,7 +18,17 @@ fn main() -> Result<()> {
     init_logging(conf.verbose)?;
 
     match conf.command {
-        ConfigCommand::Compile { input } => commands::compile(input)?,
+        ConfigCommand::Compile { input } => match commands::compile(input) {
+            Ok(bytecode) => println!("{bytecode:#?}"),
+            Err(err) => match err {
+                CompileCommandError::Input(e) => eprintln!("{e}"),
+                CompileCommandError::Parse(e) => e
+                    .report()
+                    .print((&e.source_name, Source::from(&e.source_code)))
+                    .unwrap(),
+                CompileCommandError::Compile(e) => eprintln!("{e}"),
+            },
+        },
         ConfigCommand::Parse { input } => match commands::parse(input) {
             Ok(program) => println!("{program:#?}"),
             Err(err) => {

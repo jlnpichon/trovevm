@@ -25,6 +25,8 @@ pub enum RuntimeError {
     InvalidOpcode,
     #[error("invalid constant index {0}")]
     InvalidConstantIndex(usize),
+    #[error("stack index {0} is out of bound")]
+    StackIndexOutOfBound(usize),
     #[error("type mismatch")]
     TypeMismatch,
     #[error("division by zero")]
@@ -60,6 +62,21 @@ impl VM {
 
     pub fn stack_top(&self) -> Option<&Value> {
         self.stack.last()
+    }
+
+    pub fn stack_peek(&self, index: usize) -> Result<&Value, RuntimeError> {
+        self.stack
+            .get(index)
+            .ok_or(RuntimeError::StackIndexOutOfBound(index))
+    }
+
+    pub fn stack_set(&mut self, index: usize, value: Value) -> Result<(), RuntimeError> {
+        if let Some(slot) = self.stack.get_mut(index) {
+            *slot = value;
+            Ok(())
+        } else {
+            Err(RuntimeError::StackIndexOutOfBound(index))
+        }
     }
 
     fn apply_binop(&mut self, op: Op) -> Result<(), RuntimeError> {
@@ -146,6 +163,14 @@ impl VM {
                     } else {
                         return Err(RuntimeError::UndefinedVariable(name));
                     }
+                }
+                Opcode::GetLocal(index) => {
+                    let value = self.stack_peek(*index)?;
+                    self.push(value.clone());
+                }
+                Opcode::SetLocal(index) => {
+                    let value = self.pop()?;
+                    self.stack_set(*index, value.clone())?;
                 }
 
                 Opcode::Jump(_) => todo!(),

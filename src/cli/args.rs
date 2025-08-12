@@ -6,9 +6,6 @@ pub struct Args {
     #[arg(long, short, global = true, action = clap::ArgAction::Count)]
     pub verbose: u8,
 
-    #[arg(long)]
-    pub pretty_report: bool,
-
     #[command(subcommand)]
     pub command: ArgsCommand,
 }

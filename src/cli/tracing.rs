@@ -1,4 +1,4 @@
-use miette::{IntoDiagnostic, Result};
+use anyhow::Result;
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
@@ -15,6 +15,7 @@ pub fn init_logging(verbosity: u8) -> Result<()> {
         .with(EnvFilter::new(level))
         .with(fmt::layer())
         .with(ErrorLayer::default())
-        .try_init()
-        .into_diagnostic()
+        .try_init()?;
+
+    Ok(())
 }
