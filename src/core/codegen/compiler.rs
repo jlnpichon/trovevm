@@ -135,7 +135,10 @@ impl Visitor for Compiler {
                 self.end_scope();
             }
             Statement::Return(expr) => expr.accept(self),
-            Statement::Expr(expr) => expr.accept(self),
+            Statement::Expr(expr) => {
+                expr.accept(self);
+                self.program.emit_opcode(Opcode::Pop);
+            }
             Statement::If {
                 condition,
                 then_branch,
