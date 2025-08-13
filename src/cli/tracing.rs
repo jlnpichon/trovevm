@@ -8,7 +8,8 @@ pub fn init_logging(verbosity: u8) -> Result<()> {
     let level = match verbosity {
         0 => "warn",
         1 => "info",
-        _ => "debug",
+        2 => "debug",
+        _ => "trace",
     };
 
     tracing_subscriber::registry()

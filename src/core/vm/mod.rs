@@ -2,6 +2,7 @@ pub mod bytecode;
 pub mod value;
 
 use std::collections::HashMap;
+use tracing::trace;
 
 // Re-exports
 pub use bytecode::Opcode;
@@ -96,6 +97,9 @@ impl VM {
 
         while self.ip < program.len() {
             let opcode = &program[self.ip];
+
+            trace(self.ip, &opcode, &self.stack);
+
             match opcode {
                 Opcode::Add => self.apply_binop(Op::Add)?,
                 Opcode::Sub => self.apply_binop(Op::Sub)?,
@@ -195,4 +199,18 @@ impl VM {
         }
         Ok(())
     }
+}
+
+fn trace(ip: usize, opcode: &Opcode, stack: &[Value]) {
+    use owo_colors::OwoColorize;
+
+    let op_str = format!("{:?}", opcode).yellow().to_string();
+    let stack_str = stack
+        .iter()
+        .map(|v| format!("{:?}", v).red().to_string())
+        .collect::<Vec<_>>()
+        .join(", ");
+    let ip_str = format!("IP={:02}", ip).bright_blue().to_string();
+
+    tracing::trace!("[{}] {:<25} | Stack: [{}]", ip_str, op_str, stack_str);
 }

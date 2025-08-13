@@ -159,7 +159,7 @@ impl Visitor for Compiler {
 
                 let else_offset = self.program.current_opcode_index();
                 self.program
-                    .patch_jump(jump_to_else, else_offset - jump_to_else - 1);
+                    .patch_jump(jump_to_else, else_offset - jump_to_else);
 
                 if let Some(else_branch) = &else_branch {
                     self.program.emit_opcode(Opcode::Pop); // Pop the condition
@@ -169,7 +169,7 @@ impl Visitor for Compiler {
                 if else_branch.is_some() {
                     let end_offset = self.program.current_opcode_index();
                     self.program
-                        .patch_jump(jump_to_end, end_offset - jump_to_end - 1);
+                        .patch_jump(jump_to_end, end_offset - jump_to_end);
                 }
             }
             Statement::For {
@@ -201,22 +201,23 @@ impl Visitor for Compiler {
                     self.program.emit_opcode(Opcode::Pop);
 
                     self.program.emit_opcode(Opcode::JumpBack(
-                        self.program.current_opcode_index() - start,
-                    ));
+                        self.program.current_opcode_index() - start - 1,
+                    )); // to condition
+
                     start = increment_start;
                     self.program
                         .patch_jump(body_jump, self.program.current_opcode_index() - body_jump);
                 }
+
                 body.accept(self);
 
                 self.program.emit_opcode(Opcode::JumpBack(
                     self.program.current_opcode_index() - start,
-                ));
+                )); // to increment
 
                 if let Some(exit_jump) = exit_jump {
                     let current = self.program.current_opcode_index();
                     self.program.patch_jump(exit_jump, current - exit_jump);
-                    self.program.emit_opcode(Opcode::Pop); // condition
                 }
 
                 self.end_scope();
@@ -226,6 +227,7 @@ impl Visitor for Compiler {
                 condition.accept(self);
 
                 let jump_end = self.program.emit_jump(Opcode::JumpIfFalse(0));
+                self.program.emit_opcode(Opcode::Pop); // condition
 
                 body.accept(self);
 
@@ -235,6 +237,8 @@ impl Visitor for Compiler {
 
                 let end = self.program.current_opcode_index();
                 self.program.patch_jump(jump_end, end - jump_end);
+
+                self.program.emit_opcode(Opcode::Pop); // condition
             }
         }
     }

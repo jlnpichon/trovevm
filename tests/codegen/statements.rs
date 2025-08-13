@@ -19,6 +19,39 @@ fn make_var_decl(name: &str, initializer: Option<Expr>) -> Statement {
     })
 }
 
+fn make_var_expr(name: &str) -> Expr {
+    Expr::Variable(name.to_string())
+}
+
+fn make_if(condition: Expr, then_branch: Statement, else_branch: Option<Statement>) -> Statement {
+    Statement::If {
+        condition,
+        then_branch: then_branch.into(),
+        else_branch: else_branch.map(Into::into),
+    }
+}
+
+fn make_while(condition: Expr, body: Statement) -> Statement {
+    Statement::While {
+        condition,
+        body: body.into(),
+    }
+}
+
+fn make_for(
+    initializer: Option<Statement>,
+    condition: Option<Expr>,
+    increment: Option<Expr>,
+    body: Statement,
+) -> Statement {
+    Statement::For {
+        initializer: initializer.map(Into::into),
+        condition,
+        increment,
+        body: body.into(),
+    }
+}
+
 fn make_assignment(target: Expr, value: Expr) -> Expr {
     Expr::Assign {
         target: target.into(),
@@ -32,6 +65,10 @@ fn make_number_expr(n: f64) -> Expr {
 
 fn make_string_expr(s: &str) -> Expr {
     Expr::Literal(Literal::String(s.to_string()))
+}
+
+fn make_bool_expr(b: bool) -> Expr {
+    Expr::Literal(Literal::Bool(b))
 }
 
 fn make_null_expr() -> Expr {
@@ -64,6 +101,7 @@ fn assert_program(program: &Program, expected_bytecode: &[Opcode], expected_cons
 
 fn run_compiler(statements: &[Statement], bytecode: &[Opcode], constants: &[Value]) {
     let program = compile(statements).expect("compile ast");
+    println!("{program:?}");
     assert_program(&program, bytecode, constants);
 }
 
@@ -194,5 +232,140 @@ fn test_local_var() {
             Opcode::Pop, // foo
         ],
         &[Value::Null, Value::Number(42.0)],
+    );
+}
+
+#[test]
+fn test_if() {
+    // if (true) {
+    //  42;
+    // } else {
+    //  "a string";
+    // }
+    // 42;
+    let then_branch = make_stmt_expr(make_number_expr(42.0));
+    let else_branch = make_stmt_expr(make_string_expr("a string"));
+    let statements = &[
+        make_if(make_bool_expr(true), then_branch, Some(else_branch)),
+        make_stmt_expr(make_number_expr(42.0)),
+    ];
+
+    run_compiler(
+        statements,
+        &[
+            Opcode::Push(0),
+            Opcode::JumpIfFalse(5),
+            Opcode::Pop, // condition
+            Opcode::Push(1),
+            Opcode::Pop,
+            Opcode::Jump(4),
+            Opcode::Pop, // condition
+            Opcode::Push(2),
+            Opcode::Pop,
+            Opcode::Push(1),
+            Opcode::Pop,
+        ],
+        &[
+            Value::Bool(true),
+            Value::Number(42.0),
+            Value::String("a string".to_string()),
+        ],
+    );
+}
+
+#[test]
+fn test_while() {
+    // while (true) {
+    //  42;
+    // }
+    //  "a string";
+    let statements = &[
+        make_while(make_bool_expr(true), make_stmt_expr(make_number_expr(42.0))),
+        make_stmt_expr(make_string_expr("a string")),
+    ];
+
+    run_compiler(
+        statements,
+        &[
+            Opcode::Push(0),
+            Opcode::JumpIfFalse(5),
+            Opcode::Pop, // condition
+            Opcode::Push(1),
+            Opcode::Pop,
+            Opcode::JumpBack(5),
+            Opcode::Pop,
+            Opcode::Push(2),
+            Opcode::Pop,
+        ],
+        &[
+            Value::Bool(true),
+            Value::Number(42.0),
+            Value::from("a string"),
+        ],
+    );
+}
+
+#[test]
+fn test_for() {
+    // for (let i=0; i<10; i=i+1) {
+    //  42;
+    // }
+    //  "a string";
+    let statements = &[
+        make_for(
+            Some(make_var_decl("i", Some(make_number_expr(0.0)))),
+            Some(make_binary_op(
+                BinaryOp::Lt,
+                make_var_expr("i"),
+                make_number_expr(10.0),
+            )),
+            Some(make_assignment(
+                make_var_expr("i"),
+                make_binary_op(BinaryOp::Add, make_var_expr("i"), make_number_expr(1.0)),
+            )),
+            make_stmt_expr(make_number_expr(42.0)),
+        ),
+        make_stmt_expr(make_string_expr("a string")),
+    ];
+
+    run_compiler(
+        statements,
+        &[
+            // initializer
+            Opcode::Push(0),
+            //
+            // condition
+            Opcode::GetLocal(0),
+            Opcode::Push(1),
+            Opcode::Lt,
+            Opcode::JumpIfFalse(12), // to end
+            Opcode::Pop,             //condition
+            Opcode::Jump(7),         // jump to body
+            //
+            // increment
+            Opcode::GetLocal(0),
+            Opcode::Push(2),
+            Opcode::Add,
+            Opcode::SetLocal(0),
+            Opcode::Pop,          // the SetLocal leaves the value
+            Opcode::JumpBack(11), // to condition
+            //
+            // body
+            Opcode::Push(3),
+            Opcode::Pop,
+            Opcode::JumpBack(8), // to increment
+            //
+            // end
+            Opcode::Pop, // condition
+            Opcode::Push(4),
+            Opcode::Pop,
+        ],
+        &[
+            Value::Number(0.0),
+            Value::Number(10.0),
+            Value::Number(1.0),
+            Value::Number(42.0),
+            Value::from("a string"),
+        ],
     );
 }

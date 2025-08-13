@@ -136,3 +136,9 @@ impl From<&Literal> for Value {
         }
     }
 }
+
+impl From<&str> for Value {
+    fn from(value: &str) -> Self {
+        Value::String(value.to_string())
+    }
+}
