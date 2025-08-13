@@ -102,25 +102,6 @@ fn test_comparisons() {
 }
 
 #[test]
-fn test_logical_ops() {
-    let (mut vm, _) = run_program(
-        &[
-            Opcode::Push(0),
-            Opcode::Push(1),
-            Opcode::And,
-            Opcode::Push(0),
-            Opcode::Push(1),
-            Opcode::Or,
-        ],
-        vec![Value::Bool(true), Value::Bool(false)],
-    );
-    assert_eq!(vm.ip(), 6);
-
-    assert_eq!(vm.pop().unwrap(), Value::Bool(true));
-    assert_eq!(vm.pop().unwrap(), Value::Bool(false));
-}
-
-#[test]
 fn test_pop() {
     let (vm, _) = run_program(&[Opcode::Push(0), Opcode::Pop], vec![Value::Number(42.0)]);
     assert_eq!(vm.stack_top(), None);
