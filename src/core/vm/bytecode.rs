@@ -33,6 +33,7 @@ pub enum Opcode {
     SetLocal(usize),
 
     Jump(usize),
+    JumpIfFalse(usize),
 
     Return,
 }
@@ -56,8 +57,16 @@ impl Program {
         self.bytecode.push(Opcode::Return);
     }
 
-    pub fn current_offset(&self) -> usize {
+    pub fn current_opcode_index(&self) -> usize {
         self.bytecode.len()
+    }
+
+    pub fn patch_jump(&mut self, index: usize, destination: usize) {
+        let opcode = self.bytecode.get_mut(index).expect("path_jump");
+        match opcode {
+            Opcode::JumpIfFalse(offset) | Opcode::Jump(offset) => *offset = destination,
+            _ => panic!("Expect a jump instruction to patch, got '{:?}'", opcode),
+        };
     }
 
     pub fn emit_null(&mut self) {
@@ -78,6 +87,12 @@ impl Program {
     pub fn emit_constant(&mut self, value: Value) {
         let index = self.define_constant(value);
         self.emit_opcode(Opcode::Push(index));
+    }
+
+    pub fn emit_jump(&mut self, opcode: Opcode) -> usize {
+        assert!(matches!(opcode, Opcode::JumpIfFalse(_) | Opcode::Jump(_)));
+        self.emit_opcode(opcode);
+        self.current_opcode_index() - 1
     }
 
     pub fn define_global(&mut self, name: &Identifier) {

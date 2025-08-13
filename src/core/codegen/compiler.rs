@@ -148,9 +148,28 @@ impl Visitor for Compiler {
                 else_branch,
             } => {
                 condition.accept(self);
+                let jump_to_else = self.program.emit_jump(Opcode::JumpIfFalse(0));
+                self.program.emit_opcode(Opcode::Pop); // Pop the condition
+
                 then_branch.accept(self);
+                let mut jump_to_end = 0;
+                if else_branch.is_some() {
+                    jump_to_end = self.program.emit_jump(Opcode::Jump(0));
+                }
+
+                let else_offset = self.program.current_opcode_index();
+                self.program
+                    .patch_jump(jump_to_else, else_offset - jump_to_else - 1);
+
                 if let Some(else_branch) = &else_branch {
+                    self.program.emit_opcode(Opcode::Pop); // Pop the condition
                     else_branch.accept(self)
+                }
+
+                if else_branch.is_some() {
+                    let end_offset = self.program.current_opcode_index();
+                    self.program
+                        .patch_jump(jump_to_end, end_offset - jump_to_end - 1);
                 }
             }
             Statement::For {

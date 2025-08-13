@@ -177,7 +177,17 @@ impl VM {
                     self.stack_set(*index, value.clone())?;
                 }
 
-                Opcode::Jump(_) => todo!(),
+                Opcode::Jump(offset) => {
+                    self.ip += offset;
+                    continue;
+                }
+                Opcode::JumpIfFalse(offset) => {
+                    let condition = self.stack_top().ok_or(RuntimeError::StackUnderflow)?;
+                    if !condition.is_truthy() {
+                        self.ip += offset;
+                        continue;
+                    }
+                }
                 Opcode::Return => todo!(),
             }
             self.ip += 1;
