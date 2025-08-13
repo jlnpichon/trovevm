@@ -8,11 +8,22 @@ fn make_stmt_expr(expr: Expr) -> Statement {
     Statement::Expr(expr)
 }
 
+fn make_block(statements: Vec<Statement>) -> Statement {
+    Statement::Block(statements)
+}
+
 fn make_var_decl(name: &str, initializer: Option<Expr>) -> Statement {
     Statement::VarDecl(Var {
         name: name.into(),
         initializer,
     })
+}
+
+fn make_assignment(target: Expr, value: Expr) -> Expr {
+    Expr::Assign {
+        target: target.into(),
+        value: value.into(),
+    }
 }
 
 fn make_number_expr(n: f64) -> Expr {
@@ -58,16 +69,25 @@ fn run_compiler(statements: &[Statement], bytecode: &[Opcode], constants: &[Valu
 
 #[test]
 fn test_compile_literal() {
+    // 42.0;
     let statement = make_stmt_expr(make_number_expr(42.0));
-    run_compiler(&[statement], &[Opcode::Push(0)], &[Value::Number(42.0)]);
+    run_compiler(
+        &[statement],
+        &[Opcode::Push(0), Opcode::Pop],
+        &[Value::Number(42.0)],
+    );
 
+    // "a string";
     let statement = make_stmt_expr(make_string_expr("a string"));
     run_compiler(
         &[statement],
-        &[Opcode::Push(0)],
+        &[Opcode::Push(0), Opcode::Pop],
         &[Value::String(String::from("a string"))],
     );
 
+    // "a string";
+    // 42.42;
+    // Null;
     let statements = vec![
         make_stmt_expr(make_string_expr("a string")),
         make_stmt_expr(make_number_expr(42.42)),
@@ -75,7 +95,14 @@ fn test_compile_literal() {
     ];
     run_compiler(
         &statements,
-        &[Opcode::Push(0), Opcode::Push(1), Opcode::Push(2)],
+        &[
+            Opcode::Push(0),
+            Opcode::Pop,
+            Opcode::Push(1),
+            Opcode::Pop,
+            Opcode::Push(2),
+            Opcode::Pop,
+        ],
         &[
             Value::String(String::from("a string")),
             Value::Number(42.42),
@@ -86,6 +113,9 @@ fn test_compile_literal() {
 
 #[test]
 fn test_compile_constant_reuse() {
+    // "a string";
+    // 42.0;
+    // "a string";
     let statements = vec![
         make_stmt_expr(make_string_expr("a string")),
         make_stmt_expr(make_number_expr(42.0)),
@@ -93,13 +123,21 @@ fn test_compile_constant_reuse() {
     ];
     run_compiler(
         &statements,
-        &[Opcode::Push(0), Opcode::Push(1), Opcode::Push(0)],
+        &[
+            Opcode::Push(0),
+            Opcode::Pop,
+            Opcode::Push(1),
+            Opcode::Pop,
+            Opcode::Push(0),
+            Opcode::Pop,
+        ],
         &[Value::String(String::from("a string")), Value::Number(42.0)],
     );
 }
 
 #[test]
 fn test_compile_simple_addition() {
+    // 1.0 + 2.0;
     let statement = make_stmt_expr(make_binary_op(
         BinaryOp::Add,
         make_number_expr(1.0),
@@ -108,18 +146,53 @@ fn test_compile_simple_addition() {
 
     run_compiler(
         &[statement],
-        &[Opcode::Push(0), Opcode::Push(1), Opcode::Add],
+        &[Opcode::Push(0), Opcode::Push(1), Opcode::Add, Opcode::Pop],
         &[Value::Number(1.0), Value::Number(2.0)],
     );
 }
 
 #[test]
-fn test_var_decl() {
+fn test_global_var() {
     let statement = make_var_decl("foo", Some(make_number_expr(42.0)));
 
     run_compiler(
         &[statement],
         &[Opcode::Push(0), Opcode::DefineGlobal(1)],
         &[Value::Number(42.0), Value::String("foo".into())],
+    );
+}
+
+#[test]
+fn test_local_var() {
+    // {
+    //   let foo;
+    //   {
+    //     let bar = 42.0;
+    //     foo = bar;
+    //   }
+    // }
+    let statement = make_block(vec![
+        make_var_decl("foo", None),
+        make_block(vec![
+            make_var_decl("bar", Some(make_number_expr(42.0))),
+            make_stmt_expr(make_assignment(
+                Expr::Variable("foo".to_string()),
+                Expr::Variable("bar".to_string()),
+            )),
+        ]),
+    ]);
+
+    run_compiler(
+        &[statement],
+        &[
+            Opcode::Push(0),
+            Opcode::Push(1),
+            Opcode::GetLocal(1),
+            Opcode::SetLocal(0),
+            Opcode::Pop, // expr statement pushed 42.0 (foo = bar)
+            Opcode::Pop, // foo
+            Opcode::Pop, // foo
+        ],
+        &[Value::Null, Value::Number(42.0)],
     );
 }

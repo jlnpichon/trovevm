@@ -156,8 +156,7 @@ fn test_global_var() {
             Opcode::DefineGlobal(0), // foo = Null
             Opcode::Push(0),         // foo
             Opcode::Push(1),         // 42
-            Opcode::SetGlobal,       // foo = 42
-            Opcode::GetGlobal(0),
+            Opcode::SetGlobal(0),    // foo = 42
         ],
         vec![
             Value::String("foo".into()),
@@ -166,5 +165,5 @@ fn test_global_var() {
         ],
     );
     assert_stack_top(&vm, &Value::Number(42.0));
-    assert_eq!(vm.ip(), 6);
+    assert_eq!(vm.ip(), 5);
 }

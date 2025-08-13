@@ -198,7 +198,6 @@ impl Visitor for Compiler {
                         self.program.emit_opcode(Opcode::SetGlobal(index));
                     } else {
                         let index = self.resolve_local(name).expect("resolve_local");
-                        println!("{:?}", self.locals);
                         self.program.emit_opcode(Opcode::SetLocal(index));
                     }
                 } else {

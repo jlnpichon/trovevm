@@ -56,6 +56,10 @@ impl Program {
         self.bytecode.push(Opcode::Return);
     }
 
+    pub fn current_offset(&self) -> usize {
+        self.bytecode.len()
+    }
+
     pub fn emit_null(&mut self) {
         let index = self.define_constant(Value::Null);
         self.bytecode.push(Opcode::Push(index));

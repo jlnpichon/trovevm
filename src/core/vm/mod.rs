@@ -152,7 +152,10 @@ impl VM {
                     }
                 }
                 Opcode::SetGlobal(index) => {
-                    let value = self.pop()?;
+                    let value = self
+                        .stack_top()
+                        .ok_or(RuntimeError::StackUnderflow)?
+                        .clone();
                     let name = program
                         .constant_get(*index)
                         .ok_or(RuntimeError::InvalidConstantIndex(*index))?
@@ -170,7 +173,7 @@ impl VM {
                     self.push(value.clone());
                 }
                 Opcode::SetLocal(index) => {
-                    let value = self.pop()?;
+                    let value = self.stack_top().ok_or(RuntimeError::StackUnderflow)?;
                     self.stack_set(*index, value.clone())?;
                 }
 
