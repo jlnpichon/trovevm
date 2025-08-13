@@ -115,9 +115,6 @@ impl VM {
                 Opcode::Eq => self.apply_binop(Op::Eq)?,
                 Opcode::Neq => self.apply_binop(Op::Neq)?,
 
-                Opcode::And => self.apply_binop(Op::And)?,
-                Opcode::Or => self.apply_binop(Op::Or)?,
-
                 Opcode::Pop => {
                     self.pop()?;
                 }
@@ -187,6 +184,10 @@ impl VM {
                         self.ip += offset;
                         continue;
                     }
+                }
+                Opcode::JumpBack(offset) => {
+                    self.ip -= offset;
+                    continue;
                 }
                 Opcode::Return => todo!(),
             }

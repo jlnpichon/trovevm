@@ -178,20 +178,63 @@ impl Visitor for Compiler {
                 increment,
                 body,
             } => {
+                self.begin_scope();
+                let mut start = self.program.current_opcode_index();
+                let mut exit_jump = None;
+
                 if let Some(initializer) = initializer {
                     initializer.accept(self);
                 }
+
                 if let Some(condition) = condition {
                     condition.accept(self);
+
+                    exit_jump = Some(self.program.emit_jump(Opcode::JumpIfFalse(0)));
+                    self.program.emit_opcode(Opcode::Pop); // condition
                 }
+
                 if let Some(increment) = increment {
+                    let body_jump = self.program.emit_jump(Opcode::Jump(0));
+                    let increment_start = self.program.current_opcode_index();
+
                     increment.accept(self);
+                    self.program.emit_opcode(Opcode::Pop);
+
+                    self.program.emit_opcode(Opcode::JumpBack(
+                        self.program.current_opcode_index() - start,
+                    ));
+                    start = increment_start;
+                    self.program
+                        .patch_jump(body_jump, self.program.current_opcode_index() - body_jump);
                 }
                 body.accept(self);
+
+                self.program.emit_opcode(Opcode::JumpBack(
+                    self.program.current_opcode_index() - start,
+                ));
+
+                if let Some(exit_jump) = exit_jump {
+                    let current = self.program.current_opcode_index();
+                    self.program.patch_jump(exit_jump, current - exit_jump);
+                    self.program.emit_opcode(Opcode::Pop); // condition
+                }
+
+                self.end_scope();
             }
             Statement::While { condition, body } => {
+                let start = self.program.current_opcode_index();
                 condition.accept(self);
+
+                let jump_end = self.program.emit_jump(Opcode::JumpIfFalse(0));
+
                 body.accept(self);
+
+                self.program.emit_jump(Opcode::JumpBack(
+                    self.program.current_opcode_index() - start,
+                ));
+
+                let end = self.program.current_opcode_index();
+                self.program.patch_jump(jump_end, end - jump_end);
             }
         }
     }
@@ -238,21 +281,46 @@ impl Visitor for Compiler {
             }
             Expr::Binary { op, lhs, rhs } => {
                 lhs.accept(self);
-                rhs.accept(self);
+
                 match op {
-                    BinaryOp::Add => self.program.emit_opcode(Opcode::Add),
-                    BinaryOp::Substract => self.program.emit_opcode(Opcode::Sub),
-                    BinaryOp::Multiply => self.program.emit_opcode(Opcode::Mul),
-                    BinaryOp::Divide => self.program.emit_opcode(Opcode::Div),
-                    BinaryOp::Modulo => self.program.emit_opcode(Opcode::Mod),
-                    BinaryOp::Or => self.program.emit_opcode(Opcode::Or),
-                    BinaryOp::And => self.program.emit_opcode(Opcode::And),
-                    BinaryOp::Gt => self.program.emit_opcode(Opcode::Gt),
-                    BinaryOp::Ge => self.program.emit_opcode(Opcode::Ge),
-                    BinaryOp::Lt => self.program.emit_opcode(Opcode::Lt),
-                    BinaryOp::Le => self.program.emit_opcode(Opcode::Le),
-                    BinaryOp::Eq => self.program.emit_opcode(Opcode::Eq),
-                    BinaryOp::Neq => self.program.emit_opcode(Opcode::Neq),
+                    BinaryOp::And => {
+                        let jump_end = self.program.emit_jump(Opcode::JumpIfFalse(0));
+                        self.program.emit_opcode(Opcode::Pop);
+                        rhs.accept(self);
+
+                        let end = self.program.current_opcode_index();
+                        self.program.patch_jump(jump_end, end - jump_end - 1);
+                    }
+                    BinaryOp::Or => {
+                        let jump_else = self.program.emit_jump(Opcode::JumpIfFalse(0));
+                        let jump_end = self.program.emit_jump(Opcode::Jump(0));
+                        self.program.emit_opcode(Opcode::Pop);
+
+                        let current = self.program.current_opcode_index();
+                        self.program.patch_jump(jump_else, current - jump_else - 1);
+
+                        rhs.accept(self);
+                        let end = self.program.current_opcode_index();
+                        self.program.patch_jump(jump_end, end - jump_end);
+                    }
+                    _ => {
+                        rhs.accept(self);
+                        let opcode = match op {
+                            BinaryOp::Add => Opcode::Add,
+                            BinaryOp::Substract => Opcode::Sub,
+                            BinaryOp::Multiply => Opcode::Mul,
+                            BinaryOp::Divide => Opcode::Div,
+                            BinaryOp::Modulo => Opcode::Mod,
+                            BinaryOp::Gt => Opcode::Gt,
+                            BinaryOp::Ge => Opcode::Ge,
+                            BinaryOp::Lt => Opcode::Lt,
+                            BinaryOp::Le => Opcode::Le,
+                            BinaryOp::Eq => Opcode::Eq,
+                            BinaryOp::Neq => Opcode::Neq,
+                            _ => unreachable!(),
+                        };
+                        self.program.emit_opcode(opcode);
+                    }
                 }
             }
         }

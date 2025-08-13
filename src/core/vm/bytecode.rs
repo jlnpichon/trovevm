@@ -20,9 +20,6 @@ pub enum Opcode {
     Eq,
     Neq,
 
-    And,
-    Or,
-
     Pop,
     Push(usize),
 
@@ -34,6 +31,7 @@ pub enum Opcode {
 
     Jump(usize),
     JumpIfFalse(usize),
+    JumpBack(usize),
 
     Return,
 }
@@ -90,7 +88,10 @@ impl Program {
     }
 
     pub fn emit_jump(&mut self, opcode: Opcode) -> usize {
-        assert!(matches!(opcode, Opcode::JumpIfFalse(_) | Opcode::Jump(_)));
+        assert!(matches!(
+            opcode,
+            Opcode::JumpIfFalse(_) | Opcode::Jump(_) | Opcode::JumpBack(_)
+        ));
         self.emit_opcode(opcode);
         self.current_opcode_index() - 1
     }
