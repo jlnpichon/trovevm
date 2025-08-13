@@ -1,6 +1,6 @@
 use crate::core::ast::Literal;
 
-use super::RuntimeError;
+use super::{Program, RuntimeError, function::CompiledFunction};
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -8,6 +8,7 @@ pub enum Value {
     String(String),
     Bool(bool),
     Null,
+    Function(CompiledFunction),
 }
 
 #[derive(Debug, Clone)]
@@ -95,6 +96,7 @@ impl Value {
             Value::Number(n) => n.abs() >= f64::EPSILON,
             Value::String(s) => !s.is_empty(),
             Value::Bool(b) => *b,
+            Value::Function(_) => true,
             Value::Null => false,
         }
     }

@@ -1,6 +1,8 @@
 pub mod bytecode;
+mod function;
 pub mod value;
 
+use function::CallFrame;
 use std::collections::HashMap;
 use tracing::trace;
 
@@ -13,9 +15,10 @@ use value::Op;
 
 #[derive(Debug)]
 pub struct VM {
-    stack: Vec<Value>,
+    stack: Vec<Value>, // TODO: limit
     ip: usize,
     globals: HashMap<String, Value>,
+    frames: Vec<CallFrame>, // TODO: limit
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -50,6 +53,7 @@ impl VM {
             stack: Vec::with_capacity(1024),
             ip: 0,
             globals: HashMap::new(),
+            frames: vec![],
         }
     }
 
@@ -92,13 +96,22 @@ impl VM {
         self.ip
     }
 
+    fn constant_get(&self, index: usize) -> Result<&Value, RuntimeError> {
+        let frame = self.frames.last().ok_or(RuntimeError::StackUnderflow)?;
+        frame
+            .function
+            .program
+            .constant_get(index)
+            .ok_or(RuntimeError::InvalidConstantIndex(index))
+    }
+
     pub fn run(&mut self, program: &Program) -> Result<(), RuntimeError> {
         self.ip = 0;
 
         while self.ip < program.len() {
             let opcode = &program[self.ip];
 
-            trace(self.ip, &opcode, &self.stack);
+            trace(self.ip, opcode, &self.stack);
 
             match opcode {
                 Opcode::Add => self.apply_binop(Op::Add)?,
@@ -212,5 +225,5 @@ fn trace(ip: usize, opcode: &Opcode, stack: &[Value]) {
         .join(", ");
     let ip_str = format!("IP={:02}", ip).bright_blue().to_string();
 
-    tracing::trace!("[{}] {:<25} | Stack: [{}]", ip_str, op_str, stack_str);
+    trace!("[{}] {:<25} | Stack: [{}]", ip_str, op_str, stack_str);
 }
