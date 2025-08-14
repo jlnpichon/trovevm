@@ -92,3 +92,9 @@ impl From<String> for Identifier {
         Self(value)
     }
 }
+
+impl<'a> From<&'a Identifier> for &'a str {
+    fn from(value: &'a Identifier) -> Self {
+        &value.0
+    }
+}

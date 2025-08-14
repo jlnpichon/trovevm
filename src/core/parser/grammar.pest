@@ -13,7 +13,7 @@ var_decl = { LET_KW ~ Identifier ~ (EQ ~ expr)? ~ SEMICOLON }
 // ---- Parameters and block ----
 params = _{ Identifier ~ (COMMA ~ Identifier)* }
 
-block = { LBRACE ~ statement* ~ RBRACE }
+block = { LBRACE ~ decl* ~ RBRACE }
 
 // ---- Statements ----
 statement = _{

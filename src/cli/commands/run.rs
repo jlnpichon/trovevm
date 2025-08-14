@@ -19,9 +19,9 @@ pub enum RunError {
 pub fn run(input: InputSource) -> Result<()> {
     let source = input.read_to_string()?;
     let ast = core::parser::parse_program(input.source_name(), &source).map_err(RunError::from)?;
-    let program =
+    let function =
         core::codegen::compile(&ast.statements).map_err(|e| RunError::Compile(e.into()))?;
 
     let mut vm = core::vm::VM::new();
-    Ok(vm.run(&program).map_err(|e| RunError::Runtime(e.into()))?)
+    Ok(vm.run(&function).map_err(|e| RunError::Runtime(e.into()))?)
 }

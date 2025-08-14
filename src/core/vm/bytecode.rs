@@ -33,6 +33,7 @@ pub enum Opcode {
     JumpIfFalse(usize),
     JumpBack(usize),
 
+    Call,
     Return,
 }
 

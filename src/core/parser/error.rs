@@ -34,7 +34,7 @@ fn rule_to_message(rule: &Rule) -> Option<&str> {
         Rule::var_decl => Some("a variable declaration (e.g. `let x = 42;`)"),
         Rule::params => todo!(),     //Some(String::from("parameters")),
         Rule::Identifier => todo!(), //Some(String::from("identifier")),
-        Rule::block => todo!(),
+        Rule::block => Some("a block"),
         Rule::statement => todo!(),
         Rule::expr_stmt => Some("an expression statement"),
         Rule::for_stmt => Some("a for statement"),

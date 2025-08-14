@@ -1,7 +1,7 @@
 use trovevm::core::{
     ast::{BinaryOp, Expr, Literal, Statement, Var},
     codegen::compile,
-    vm::{Opcode, Program, Value},
+    vm::{Opcode, Program, Value, function::CompiledFunction},
 };
 
 fn make_stmt_expr(expr: Expr) -> Statement {
@@ -83,8 +83,12 @@ fn make_binary_op(op: BinaryOp, lhs: Expr, rhs: Expr) -> Expr {
     }
 }
 
-fn assert_program(program: &Program, expected_bytecode: &[Opcode], expected_constants: &[Value]) {
-    let (bytecode, constants) = program.as_slices();
+fn assert_program(
+    function: &CompiledFunction,
+    expected_bytecode: &[Opcode],
+    expected_constants: &[Value],
+) {
+    let (bytecode, constants) = function.as_slices();
     assert_eq!(
         bytecode.len(),
         expected_bytecode.len(),
@@ -100,8 +104,8 @@ fn assert_program(program: &Program, expected_bytecode: &[Opcode], expected_cons
 }
 
 fn run_compiler(statements: &[Statement], bytecode: &[Opcode], constants: &[Value]) {
-    let program = compile(statements).expect("compile ast");
-    assert_program(&program, bytecode, constants);
+    let function = compile(statements).expect("compile ast");
+    assert_program(&function, bytecode, constants);
 }
 
 #[test]

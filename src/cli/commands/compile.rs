@@ -1,5 +1,6 @@
 use crate::cli::input::{InputError, InputSource};
 use crate::core::vm::Program;
+use crate::core::vm::function::CompiledFunction;
 use crate::core::{self, codegen::CompileError, parser::error::ParseErrorWithContext};
 
 #[derive(Debug, thiserror::Error)]
@@ -12,7 +13,7 @@ pub enum CompileCommandError {
     Compile(#[from] Box<CompileError>),
 }
 
-pub fn compile(input: InputSource) -> Result<Program, CompileCommandError> {
+pub fn compile(input: InputSource) -> Result<CompiledFunction, CompileCommandError> {
     let source = input.read_to_string()?;
     let program = core::parser::parse_program(input.source_name(), &source)
         .map_err(CompileCommandError::from)?;

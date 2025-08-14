@@ -1,10 +1,13 @@
-use trovevm::core::vm::{Opcode, Program, RuntimeError, VM, Value};
+use trovevm::core::vm::{Opcode, Program, RuntimeError, VM, Value, function::CompiledFunction};
 
-fn run_program<const N: usize>(bytecode: &[Opcode; N], constants: Vec<Value>) -> (VM, Program) {
-    let program = Program::from((bytecode, constants));
+fn run_program<const N: usize>(
+    bytecode: &[Opcode; N],
+    constants: Vec<Value>,
+) -> (VM, CompiledFunction) {
+    let function = CompiledFunction::from((bytecode, constants));
     let mut vm = VM::new();
-    vm.run(&program).expect("run the program");
-    (vm, program)
+    vm.run(&function).expect("run the program");
+    (vm, function)
 }
 
 fn assert_stack_top(vm: &VM, expected: &Value) {
@@ -109,9 +112,9 @@ fn test_pop() {
 
 #[test]
 fn test_invalid_constant_index() {
-    let program = Program::from((&[Opcode::Push(100)], vec![Value::Number(1.0)]));
+    let function = CompiledFunction::from((&[Opcode::Push(100)], vec![Value::Number(1.0)]));
     let mut vm = VM::new();
-    let result = vm.run(&program);
+    let result = vm.run(&function);
     assert!(matches!(
         result,
         Err(RuntimeError::InvalidConstantIndex(100))
@@ -120,12 +123,12 @@ fn test_invalid_constant_index() {
 
 #[test]
 fn test_division_by_zero() {
-    let program = Program::from((
+    let function = CompiledFunction::from((
         &[Opcode::Push(0), Opcode::Push(1), Opcode::Div],
         vec![Value::Number(1.0), Value::Number(0.0)],
     ));
     let mut vm = VM::new();
-    let result = vm.run(&program);
+    let result = vm.run(&function);
     assert!(matches!(result, Err(RuntimeError::DivisionByZero)));
 }
 

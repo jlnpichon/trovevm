@@ -1,8 +1,9 @@
 pub mod bytecode;
-mod function;
+pub mod function;
 pub mod value;
 
 use function::CallFrame;
+use function::CompiledFunction;
 use std::collections::HashMap;
 use tracing::trace;
 
@@ -105,8 +106,9 @@ impl VM {
             .ok_or(RuntimeError::InvalidConstantIndex(index))
     }
 
-    pub fn run(&mut self, program: &Program) -> Result<(), RuntimeError> {
+    pub fn run(&mut self, function: &CompiledFunction) -> Result<(), RuntimeError> {
         self.ip = 0;
+        let program = &function.program;
 
         while self.ip < program.len() {
             let opcode = &program[self.ip];
@@ -206,6 +208,8 @@ impl VM {
                     self.ip -= offset;
                     continue;
                 }
+
+                Opcode::Call => todo!(),
                 Opcode::Return => todo!(),
             }
             self.ip += 1;

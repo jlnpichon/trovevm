@@ -1,6 +1,11 @@
 use crate::core::{
-    ast::{BinaryOp, Contract, Expr, Function, Literal, Statement, UnaryOp, Var, Visitor},
-    vm::{Opcode, Program, Value},
+    ast::{
+        BinaryOp, Contract, Expr, Function, Identifier, Literal, Statement, UnaryOp, Var, Visitor,
+    },
+    vm::{
+        Opcode, Value,
+        function::{CompiledFunction, Local},
+    },
 };
 
 const MAX_LOCAL_VARS: usize = 255;
@@ -18,36 +23,38 @@ pub enum CompileError {
     VariableInOwnInitializer,
 }
 
-#[derive(Debug, Clone)]
-pub struct Local {
-    name: String,
-    depth: Option<usize>,
-}
-
 #[derive(Debug, Clone, Default)]
 pub struct Compiler {
-    program: Program,
+    function: CompiledFunction,
     locals: Vec<Local>,
     scope_depth: usize,
 }
 
 impl Compiler {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(name: &str) -> Self {
+        Self {
+            function: CompiledFunction::new(name),
+            ..Default::default()
+        }
     }
 }
 
-pub fn compile(statements: &[Statement]) -> Result<Program, CompileError> {
-    let compiler = Compiler::new();
-    compiler.compile(statements)
+pub fn compile(statements: &[Statement]) -> Result<CompiledFunction, CompileError> {
+    let mut compiler = Compiler::new("script");
+    compiler.compile(statements)?;
+    compiler.end()
 }
 
 impl Compiler {
-    pub fn compile(mut self, statements: &[Statement]) -> Result<Program, CompileError> {
+    pub fn compile(&mut self, statements: &[Statement]) -> Result<(), CompileError> {
         for statement in statements {
             self.visit_statement(statement);
         }
-        Ok(self.program)
+        Ok(())
+    }
+
+    pub fn end(self) -> Result<CompiledFunction, CompileError> {
+        Ok(self.function)
     }
 
     pub fn begin_scope(&mut self) {
@@ -60,8 +67,8 @@ impl Compiler {
         // Pop all the local variables
         while let Some(local) = self.locals.last() {
             match local.depth {
-                Some(d) if d > self.scope_depth => {
-                    self.program.emit_opcode(Opcode::Pop);
+                Some(d) if d > self.scope_depth && !local.is_function => {
+                    self.emit_opcode(Opcode::Pop);
                     self.locals.pop();
                 }
                 _ => break,
@@ -69,7 +76,7 @@ impl Compiler {
         }
     }
 
-    fn add_local(&mut self, name: &str) -> Result<(), CompileError> {
+    fn add_local(&mut self, name: &str, is_function: bool) -> Result<usize, CompileError> {
         if self.locals.len() > MAX_LOCAL_VARS {
             return Err(CompileError::TooManyLocalVars);
         }
@@ -88,24 +95,56 @@ impl Compiler {
         self.locals.push(Local {
             name: name.to_string(),
             depth: None,
+            is_function,
         });
 
-        Ok(())
+        Ok(self.locals.len() - 1)
     }
 
-    fn resolve_local(&self, name: &str) -> Result<usize, CompileError> {
+    fn resolve_local(&self, name: &str) -> Result<Option<usize>, CompileError> {
         for (i_rev, local) in self.locals.iter().rev().enumerate() {
             if name == local.name {
-                match local.depth {
-                    Some(_) => {
-                        let index = self.locals.len() - 1 - i_rev;
-                        return Ok(index);
-                    }
-                    None => return Err(CompileError::VariableInOwnInitializer),
+                if local.depth.is_some() || local.is_function {
+                    let index = self.locals.len() - 1 - i_rev;
+                    return Ok(Some(index));
+                } else {
+                    return Err(CompileError::VariableInOwnInitializer);
                 }
             }
         }
-        Err(CompileError::VariableNotFound(name.to_string()))
+        Ok(None)
+    }
+
+    fn define_constant(&mut self, value: Value) -> usize {
+        self.function.program.define_constant(value)
+    }
+
+    fn define_global(&mut self, name: &Identifier) {
+        self.function.program.define_global(name);
+    }
+
+    fn emit_opcode(&mut self, opcode: Opcode) {
+        self.function.program.emit_opcode(opcode);
+    }
+
+    fn emit_jump(&mut self, jump: Opcode) -> usize {
+        self.function.program.emit_jump(jump)
+    }
+
+    fn current_opcode_index(&self) -> usize {
+        self.function.program.current_opcode_index()
+    }
+
+    fn patch_jump(&mut self, index: usize, offset: usize) {
+        self.function.program.patch_jump(index, offset);
+    }
+
+    fn emit_constant(&mut self, value: Value) {
+        self.function.program.emit_constant(value);
+    }
+
+    fn emit_null(&mut self) {
+        self.function.program.emit_null();
     }
 
     fn mark_initialized(&mut self) {
@@ -140,7 +179,11 @@ impl Visitor for Compiler {
             Statement::Return(expr) => expr.accept(self),
             Statement::Expr(expr) => {
                 expr.accept(self);
-                self.program.emit_opcode(Opcode::Pop);
+                // Do not pop after a call, the return implicitly pop the stack
+                match expr {
+                    Expr::FnCall { .. } => (),
+                    _ => self.emit_opcode(Opcode::Pop),
+                }
             }
             Statement::If {
                 condition,
@@ -148,28 +191,26 @@ impl Visitor for Compiler {
                 else_branch,
             } => {
                 condition.accept(self);
-                let jump_to_else = self.program.emit_jump(Opcode::JumpIfFalse(0));
-                self.program.emit_opcode(Opcode::Pop); // Pop the condition
+                let jump_to_else = self.emit_jump(Opcode::JumpIfFalse(0));
+                self.emit_opcode(Opcode::Pop); // Pop the condition
 
                 then_branch.accept(self);
                 let mut jump_to_end = 0;
                 if else_branch.is_some() {
-                    jump_to_end = self.program.emit_jump(Opcode::Jump(0));
+                    jump_to_end = self.emit_jump(Opcode::Jump(0));
                 }
 
-                let else_offset = self.program.current_opcode_index();
-                self.program
-                    .patch_jump(jump_to_else, else_offset - jump_to_else);
+                let else_offset = self.current_opcode_index();
+                self.patch_jump(jump_to_else, else_offset - jump_to_else);
 
                 if let Some(else_branch) = &else_branch {
-                    self.program.emit_opcode(Opcode::Pop); // Pop the condition
+                    self.emit_opcode(Opcode::Pop); // Pop the condition
                     else_branch.accept(self)
                 }
 
                 if else_branch.is_some() {
-                    let end_offset = self.program.current_opcode_index();
-                    self.program
-                        .patch_jump(jump_to_end, end_offset - jump_to_end);
+                    let end_offset = self.current_opcode_index();
+                    self.patch_jump(jump_to_end, end_offset - jump_to_end);
                 }
             }
             Statement::For {
@@ -179,7 +220,7 @@ impl Visitor for Compiler {
                 body,
             } => {
                 self.begin_scope();
-                let mut start = self.program.current_opcode_index();
+                let mut start = self.current_opcode_index();
                 let mut exit_jump = None;
 
                 if let Some(initializer) = initializer {
@@ -189,56 +230,49 @@ impl Visitor for Compiler {
                 if let Some(condition) = condition {
                     condition.accept(self);
 
-                    exit_jump = Some(self.program.emit_jump(Opcode::JumpIfFalse(0)));
-                    self.program.emit_opcode(Opcode::Pop); // condition
+                    exit_jump = Some(self.emit_jump(Opcode::JumpIfFalse(0)));
+                    self.emit_opcode(Opcode::Pop); // condition
                 }
 
                 if let Some(increment) = increment {
-                    let body_jump = self.program.emit_jump(Opcode::Jump(0));
-                    let increment_start = self.program.current_opcode_index();
+                    let body_jump = self.emit_jump(Opcode::Jump(0));
+                    let increment_start = self.current_opcode_index();
 
                     increment.accept(self);
-                    self.program.emit_opcode(Opcode::Pop);
+                    self.emit_opcode(Opcode::Pop);
 
-                    self.program.emit_opcode(Opcode::JumpBack(
-                        self.program.current_opcode_index() - start - 1,
-                    )); // to condition
+                    self.emit_opcode(Opcode::JumpBack(self.current_opcode_index() - start - 1)); // to condition
 
                     start = increment_start;
-                    self.program
-                        .patch_jump(body_jump, self.program.current_opcode_index() - body_jump);
+                    self.patch_jump(body_jump, self.current_opcode_index() - body_jump);
                 }
 
                 body.accept(self);
 
-                self.program.emit_opcode(Opcode::JumpBack(
-                    self.program.current_opcode_index() - start,
-                )); // to increment
+                self.emit_opcode(Opcode::JumpBack(self.current_opcode_index() - start)); // to increment
 
                 if let Some(exit_jump) = exit_jump {
-                    let current = self.program.current_opcode_index();
-                    self.program.patch_jump(exit_jump, current - exit_jump);
+                    let current = self.current_opcode_index();
+                    self.patch_jump(exit_jump, current - exit_jump);
                 }
 
                 self.end_scope();
             }
             Statement::While { condition, body } => {
-                let start = self.program.current_opcode_index();
+                let start = self.current_opcode_index();
                 condition.accept(self);
 
-                let jump_end = self.program.emit_jump(Opcode::JumpIfFalse(0));
-                self.program.emit_opcode(Opcode::Pop); // condition
+                let jump_end = self.emit_jump(Opcode::JumpIfFalse(0));
+                self.emit_opcode(Opcode::Pop); // condition
 
                 body.accept(self);
 
-                self.program.emit_jump(Opcode::JumpBack(
-                    self.program.current_opcode_index() - start,
-                ));
+                self.emit_jump(Opcode::JumpBack(self.current_opcode_index() - start));
 
-                let end = self.program.current_opcode_index();
-                self.program.patch_jump(jump_end, end - jump_end);
+                let end = self.current_opcode_index();
+                self.patch_jump(jump_end, end - jump_end);
 
-                self.program.emit_opcode(Opcode::Pop); // condition
+                self.emit_opcode(Opcode::Pop); // condition
             }
         }
     }
@@ -247,24 +281,22 @@ impl Visitor for Compiler {
         match e {
             Expr::Literal(literal) => self.visit_literal(literal),
             Expr::Variable(var) => {
-                if self.scope_depth == 0 {
-                    let index = self.program.define_constant(Value::String(var.clone()));
-                    self.program.emit_opcode(Opcode::GetGlobal(index));
+                if let Some(index) = self.resolve_local(var).expect("resolve_local") {
+                    self.emit_opcode(Opcode::GetLocal(index));
                 } else {
-                    let index = self.resolve_local(var).expect("resolve_local");
-                    self.program.emit_opcode(Opcode::GetLocal(index));
+                    let index = self.define_constant(Value::String(var.clone()));
+                    self.emit_opcode(Opcode::GetGlobal(index));
                 }
             }
             Expr::Assign { target, value } => {
                 value.accept(self);
 
                 if let Expr::Variable(name) = target.as_ref() {
-                    if self.scope_depth == 0 {
-                        let index = self.program.define_constant(Value::String(name.clone()));
-                        self.program.emit_opcode(Opcode::SetGlobal(index));
+                    if let Some(index) = self.resolve_local(name).expect("resolve_local") {
+                        self.emit_opcode(Opcode::SetLocal(index));
                     } else {
-                        let index = self.resolve_local(name).expect("resolve_local");
-                        self.program.emit_opcode(Opcode::SetLocal(index));
+                        let index = self.define_constant(Value::String(name.clone()));
+                        self.emit_opcode(Opcode::SetGlobal(index));
                     }
                 } else {
                     panic!("Unsupported assignment target {target:?}");
@@ -272,15 +304,19 @@ impl Visitor for Compiler {
             }
             Expr::FnCall { callee, args } => {
                 callee.accept(self);
+
                 for arg in args {
                     arg.accept(self);
                 }
+
+                self.emit_opcode(Opcode::Call);
+                self.emit_opcode(Opcode::Return);
             }
             Expr::Unary { op, expr } => {
                 expr.accept(self);
                 match op {
                     UnaryOp::Not => todo!(),
-                    UnaryOp::Minus => self.program.emit_opcode(Opcode::Neg),
+                    UnaryOp::Minus => self.emit_opcode(Opcode::Neg),
                 }
             }
             Expr::Binary { op, lhs, rhs } => {
@@ -288,24 +324,24 @@ impl Visitor for Compiler {
 
                 match op {
                     BinaryOp::And => {
-                        let jump_end = self.program.emit_jump(Opcode::JumpIfFalse(0));
-                        self.program.emit_opcode(Opcode::Pop);
+                        let jump_end = self.emit_jump(Opcode::JumpIfFalse(0));
+                        self.emit_opcode(Opcode::Pop);
                         rhs.accept(self);
 
-                        let end = self.program.current_opcode_index();
-                        self.program.patch_jump(jump_end, end - jump_end - 1);
+                        let end = self.current_opcode_index();
+                        self.patch_jump(jump_end, end - jump_end - 1);
                     }
                     BinaryOp::Or => {
-                        let jump_else = self.program.emit_jump(Opcode::JumpIfFalse(0));
-                        let jump_end = self.program.emit_jump(Opcode::Jump(0));
-                        self.program.emit_opcode(Opcode::Pop);
+                        let jump_else = self.emit_jump(Opcode::JumpIfFalse(0));
+                        let jump_end = self.emit_jump(Opcode::Jump(0));
+                        self.emit_opcode(Opcode::Pop);
 
-                        let current = self.program.current_opcode_index();
-                        self.program.patch_jump(jump_else, current - jump_else - 1);
+                        let current = self.current_opcode_index();
+                        self.patch_jump(jump_else, current - jump_else - 1);
 
                         rhs.accept(self);
-                        let end = self.program.current_opcode_index();
-                        self.program.patch_jump(jump_end, end - jump_end);
+                        let end = self.current_opcode_index();
+                        self.patch_jump(jump_end, end - jump_end);
                     }
                     _ => {
                         rhs.accept(self);
@@ -323,7 +359,7 @@ impl Visitor for Compiler {
                             BinaryOp::Neq => Opcode::Neq,
                             _ => unreachable!(),
                         };
-                        self.program.emit_opcode(opcode);
+                        self.emit_opcode(opcode);
                     }
                 }
             }
@@ -332,24 +368,24 @@ impl Visitor for Compiler {
 
     fn visit_literal(&mut self, l: &Literal) {
         let value = Value::from(l);
-        self.program.emit_constant(value);
+        self.emit_constant(value);
     }
 
     fn visit_var_decl(&mut self, v: &Var) {
         if self.scope_depth > 0 {
-            self.add_local(&v.name).expect("add_local");
+            self.add_local(&v.name, false).expect("add_local");
         }
 
         if let Some(initializer) = &v.initializer {
             initializer.accept(self);
         } else {
-            self.program.emit_null();
+            self.emit_null();
         }
 
         if self.scope_depth > 0 {
             self.mark_initialized();
         } else {
-            self.program.define_global(&v.name);
+            self.define_global(&v.name);
         }
     }
 
@@ -363,6 +399,27 @@ impl Visitor for Compiler {
     }
 
     fn visit_fn_decl(&mut self, f: &Function) {
-        f.body.accept(self);
+        let mut compiler = Compiler::new(&f.name);
+
+        compiler.begin_scope();
+        for param in &f.params {
+            compiler.add_local(param, false).expect("add_local");
+            compiler.mark_initialized();
+        }
+
+        compiler
+            .compile(std::slice::from_ref(&*f.body))
+            .expect("compile");
+
+        let mut func_obj = compiler.end().expect("compile");
+        func_obj.arity = f.params.len();
+
+        let index = self.define_constant(Value::Function(func_obj));
+        if self.scope_depth == 0 {
+            self.emit_opcode(Opcode::DefineGlobal(index));
+        } else {
+            self.add_local(&f.name, true).expect("add_local");
+            self.emit_opcode(Opcode::SetLocal(index));
+        }
     }
 }
