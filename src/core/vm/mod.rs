@@ -17,7 +17,6 @@ use value::Op;
 #[derive(Debug)]
 pub struct VM {
     stack: Vec<Value>, // TODO: limit
-    ip: usize,
     globals: HashMap<String, Value>,
     frames: Vec<CallFrame>, // TODO: limit
 }
@@ -32,14 +31,18 @@ pub enum RuntimeError {
     InvalidConstantIndex(usize),
     #[error("stack index {0} is out of bound")]
     StackIndexOutOfBound(usize),
-    #[error("type mismatch")]
-    TypeMismatch,
+    #[error("type error: {0}")]
+    TypeError(String),
     #[error("division by zero")]
     DivisionByZero,
     #[error("invalid operation '{0:?}' on string")]
     InvalidStringOperation(Op),
     #[error("undefined variable '{0:?}'")]
     UndefinedVariable(String),
+    #[error("No call frame in VM")]
+    NoCallFrame,
+    #[error("ip is out of bounds")]
+    OutOfBoundsIp,
 }
 
 impl Default for VM {
@@ -52,7 +55,6 @@ impl VM {
     pub fn new() -> Self {
         Self {
             stack: Vec::with_capacity(1024),
-            ip: 0,
             globals: HashMap::new(),
             frames: vec![],
         }
@@ -71,17 +73,21 @@ impl VM {
     }
 
     pub fn stack_peek(&self, index: usize) -> Result<&Value, RuntimeError> {
+        let frame = self.frames.last().ok_or(RuntimeError::NoCallFrame)?;
+
         self.stack
-            .get(index)
+            .get(frame.base + index)
             .ok_or(RuntimeError::StackIndexOutOfBound(index))
     }
 
     pub fn stack_set(&mut self, index: usize, value: Value) -> Result<(), RuntimeError> {
-        if let Some(slot) = self.stack.get_mut(index) {
+        let frame = self.frames.last().ok_or(RuntimeError::NoCallFrame)?;
+
+        if let Some(slot) = self.stack.get_mut(frame.base + index) {
             *slot = value;
             Ok(())
         } else {
-            Err(RuntimeError::StackIndexOutOfBound(index))
+            Err(RuntimeError::StackIndexOutOfBound(frame.base + index))
         }
     }
 
@@ -93,12 +99,25 @@ impl VM {
         Ok(())
     }
 
-    pub fn ip(&self) -> usize {
-        self.ip
+    pub fn ip(&self) -> Result<usize, RuntimeError> {
+        Ok(self.frames.last().ok_or(RuntimeError::NoCallFrame)?.ip)
+    }
+
+    pub fn ip_mut(&mut self) -> Result<&mut usize, RuntimeError> {
+        Ok(&mut self.frames.last_mut().ok_or(RuntimeError::NoCallFrame)?.ip)
+    }
+
+    pub fn program(&self) -> Result<&Program, RuntimeError> {
+        Ok(&self
+            .frames
+            .last()
+            .ok_or(RuntimeError::NoCallFrame)?
+            .function
+            .program)
     }
 
     fn constant_get(&self, index: usize) -> Result<&Value, RuntimeError> {
-        let frame = self.frames.last().ok_or(RuntimeError::StackUnderflow)?;
+        let frame = self.frames.last().ok_or(RuntimeError::NoCallFrame)?;
         frame
             .function
             .program
@@ -106,14 +125,38 @@ impl VM {
             .ok_or(RuntimeError::InvalidConstantIndex(index))
     }
 
-    pub fn run(&mut self, function: &CompiledFunction) -> Result<(), RuntimeError> {
-        self.ip = 0;
-        let program = &function.program;
+    fn call(&mut self, function: CompiledFunction, args: usize) {
+        self.frames.push(CallFrame {
+            function,
+            ip: 0,
+            base: self.stack.len() - args - 1,
+        });
+    }
 
-        while self.ip < program.len() {
-            let opcode = &program[self.ip];
+    fn read_opcode(&self) -> Result<Opcode, RuntimeError> {
+        let ip = self.ip()?;
+        let program = self.program()?;
+        if ip > program.len() - 1 {
+            return Err(RuntimeError::OutOfBoundsIp);
+        }
 
-            trace(self.ip, opcode, &self.stack);
+        Ok(program[ip])
+    }
+
+    pub fn run(&mut self, function: CompiledFunction) -> Result<Value, RuntimeError> {
+        let function_obj = Value::Function(function.clone());
+        self.push(function_obj);
+
+        self.call(function, 0);
+
+        self.run_loop()
+    }
+
+    fn run_loop(&mut self) -> Result<Value, RuntimeError> {
+        loop {
+            let opcode = self.read_opcode()?;
+
+            trace(self.ip()?, &opcode, &self.stack);
 
             match opcode {
                 Opcode::Add => self.apply_binop(Op::Add)?,
@@ -138,28 +181,28 @@ impl VM {
                     self.pop()?;
                 }
                 Opcode::Push(index) => {
-                    let value = program
-                        .constant_get(*index)
-                        .ok_or(RuntimeError::InvalidConstantIndex(*index))?;
+                    let value = self.constant_get(index)?;
                     self.push(value.clone());
                 }
 
                 Opcode::DefineGlobal(index) => {
-                    let name = program
-                        .constant_get(*index)
-                        .ok_or(RuntimeError::InvalidConstantIndex(*index))?
+                    let name = self
+                        .constant_get(index)?
                         .as_string()
-                        .ok_or(RuntimeError::TypeMismatch)?
+                        .ok_or(RuntimeError::TypeError(
+                            "DefineGlobal: constant must be string".into(),
+                        ))?
                         .clone();
                     let value = self.pop()?;
                     self.globals.insert(name, value);
                 }
                 Opcode::GetGlobal(index) => {
-                    let name = program
-                        .constant_get(*index)
-                        .ok_or(RuntimeError::InvalidConstantIndex(*index))?
+                    let name = self
+                        .constant_get(index)?
                         .as_string()
-                        .ok_or(RuntimeError::TypeMismatch)?
+                        .ok_or(RuntimeError::TypeError(
+                            "GetGlobal: constant must be a string".into(),
+                        ))?
                         .clone();
                     if let Some(value) = self.globals.get(&name) {
                         self.push(value.clone());
@@ -172,11 +215,12 @@ impl VM {
                         .stack_top()
                         .ok_or(RuntimeError::StackUnderflow)?
                         .clone();
-                    let name = program
-                        .constant_get(*index)
-                        .ok_or(RuntimeError::InvalidConstantIndex(*index))?
+                    let name = self
+                        .constant_get(index)?
                         .as_string()
-                        .ok_or(RuntimeError::TypeMismatch)?
+                        .ok_or(RuntimeError::TypeError(
+                            "SetGlobal: constant must be a string".into(),
+                        ))?
                         .clone();
                     if let Some(v) = self.globals.get_mut(&name) {
                         *v = value;
@@ -185,36 +229,55 @@ impl VM {
                     }
                 }
                 Opcode::GetLocal(index) => {
-                    let value = self.stack_peek(*index)?;
+                    let value = self.stack_peek(index)?;
                     self.push(value.clone());
                 }
                 Opcode::SetLocal(index) => {
                     let value = self.stack_top().ok_or(RuntimeError::StackUnderflow)?;
-                    self.stack_set(*index, value.clone())?;
+                    self.stack_set(index, value.clone())?;
                 }
 
                 Opcode::Jump(offset) => {
-                    self.ip += offset;
+                    *self.ip_mut()? += offset;
                     continue;
                 }
                 Opcode::JumpIfFalse(offset) => {
                     let condition = self.stack_top().ok_or(RuntimeError::StackUnderflow)?;
                     if !condition.is_truthy() {
-                        self.ip += offset;
+                        *self.ip_mut()? += offset;
                         continue;
                     }
                 }
                 Opcode::JumpBack(offset) => {
-                    self.ip -= offset;
+                    *self.ip_mut()? -= offset;
                     continue;
                 }
 
-                Opcode::Call => todo!(),
-                Opcode::Return => todo!(),
+                Opcode::Call => {
+                    let function = self.pop()?.to_function().ok_or(RuntimeError::TypeError(
+                        "Can only call function or class".into(),
+                    ))?;
+                    let arity = function.arity;
+                    self.call(function, arity);
+                }
+                Opcode::Return => {
+                    let return_value = if self.stack.len() > 1 {
+                        self.pop()?
+                    } else {
+                        Value::Null
+                    };
+                    let frame = self.frames.pop().ok_or(RuntimeError::NoCallFrame);
+
+                    if self.frames.is_empty() {
+                        self.pop()?; // main function
+                        return Ok(return_value);
+                    } else {
+                        todo!()
+                    }
+                }
             }
-            self.ip += 1;
+            *self.ip_mut()? += 1;
         }
-        Ok(())
     }
 }
 

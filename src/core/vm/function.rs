@@ -16,8 +16,9 @@ pub struct Local {
 
 #[derive(Debug, Clone)]
 pub struct CallFrame {
-    pub function: Box<CompiledFunction>,
-    pub slots: Vec<Value>,
+    pub function: CompiledFunction,
+    pub ip: usize,
+    pub base: usize,
 }
 
 impl CompiledFunction {

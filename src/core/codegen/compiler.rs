@@ -53,7 +53,8 @@ impl Compiler {
         Ok(())
     }
 
-    pub fn end(self) -> Result<CompiledFunction, CompileError> {
+    pub fn end(mut self) -> Result<CompiledFunction, CompileError> {
+        self.emit_opcode(Opcode::Return);
         Ok(self.function)
     }
 
@@ -176,7 +177,9 @@ impl Visitor for Compiler {
                 }
                 self.end_scope();
             }
-            Statement::Return(expr) => expr.accept(self),
+            Statement::Return(expr) => {
+                expr.accept(self);
+            }
             Statement::Expr(expr) => {
                 expr.accept(self);
                 // Do not pop after a call, the return implicitly pop the stack
@@ -310,7 +313,6 @@ impl Visitor for Compiler {
                 }
 
                 self.emit_opcode(Opcode::Call);
-                self.emit_opcode(Opcode::Return);
             }
             Expr::Unary { op, expr } => {
                 expr.accept(self);

@@ -4,7 +4,7 @@ use crate::core::ast::Identifier;
 
 use super::Value;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Opcode {
     Add,
     Sub,

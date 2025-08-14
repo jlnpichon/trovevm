@@ -42,7 +42,10 @@ fn main() -> Result<()> {
                 std::process::exit(1);
             }
         },
-        ConfigCommand::Run { input } => commands::run(input)?,
+        ConfigCommand::Run { input } => {
+            let value = commands::run(input)?;
+            println!("{value:?}");
+        }
     };
 
     Ok(())

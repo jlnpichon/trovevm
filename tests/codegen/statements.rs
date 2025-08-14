@@ -1,7 +1,7 @@
 use trovevm::core::{
     ast::{BinaryOp, Expr, Literal, Statement, Var},
     codegen::compile,
-    vm::{Opcode, Program, Value, function::CompiledFunction},
+    vm::{Opcode, Value, function::CompiledFunction},
 };
 
 fn make_stmt_expr(expr: Expr) -> Statement {
@@ -114,7 +114,7 @@ fn test_compile_literal() {
     let statement = make_stmt_expr(make_number_expr(42.0));
     run_compiler(
         &[statement],
-        &[Opcode::Push(0), Opcode::Pop],
+        &[Opcode::Push(0), Opcode::Pop, Opcode::Return],
         &[Value::Number(42.0)],
     );
 
@@ -122,7 +122,7 @@ fn test_compile_literal() {
     let statement = make_stmt_expr(make_string_expr("a string"));
     run_compiler(
         &[statement],
-        &[Opcode::Push(0), Opcode::Pop],
+        &[Opcode::Push(0), Opcode::Pop, Opcode::Return],
         &[Value::String(String::from("a string"))],
     );
 
@@ -143,6 +143,7 @@ fn test_compile_literal() {
             Opcode::Pop,
             Opcode::Push(2),
             Opcode::Pop,
+            Opcode::Return,
         ],
         &[
             Value::String(String::from("a string")),
@@ -171,6 +172,7 @@ fn test_compile_constant_reuse() {
             Opcode::Pop,
             Opcode::Push(0),
             Opcode::Pop,
+            Opcode::Return,
         ],
         &[Value::String(String::from("a string")), Value::Number(42.0)],
     );
@@ -187,7 +189,13 @@ fn test_compile_simple_addition() {
 
     run_compiler(
         &[statement],
-        &[Opcode::Push(0), Opcode::Push(1), Opcode::Add, Opcode::Pop],
+        &[
+            Opcode::Push(0),
+            Opcode::Push(1),
+            Opcode::Add,
+            Opcode::Pop,
+            Opcode::Return,
+        ],
         &[Value::Number(1.0), Value::Number(2.0)],
     );
 }
@@ -198,7 +206,7 @@ fn test_global_var() {
 
     run_compiler(
         &[statement],
-        &[Opcode::Push(0), Opcode::DefineGlobal(1)],
+        &[Opcode::Push(0), Opcode::DefineGlobal(1), Opcode::Return],
         &[Value::Number(42.0), Value::String("foo".into())],
     );
 }
@@ -233,6 +241,7 @@ fn test_local_var() {
             Opcode::Pop, // expr statement pushed 42.0 (foo = bar)
             Opcode::Pop, // foo
             Opcode::Pop, // foo
+            Opcode::Return,
         ],
         &[Value::Null, Value::Number(42.0)],
     );
@@ -267,6 +276,7 @@ fn test_if() {
             Opcode::Pop,
             Opcode::Push(1),
             Opcode::Pop,
+            Opcode::Return,
         ],
         &[
             Value::Bool(true),
@@ -299,6 +309,7 @@ fn test_while() {
             Opcode::Pop,
             Opcode::Push(2),
             Opcode::Pop,
+            Opcode::Return,
         ],
         &[
             Value::Bool(true),
@@ -362,6 +373,7 @@ fn test_for() {
             Opcode::Pop, // condition
             Opcode::Push(4),
             Opcode::Pop,
+            Opcode::Return,
         ],
         &[
             Value::Number(0.0),

@@ -1,6 +1,6 @@
 use crate::core::ast::Literal;
 
-use super::{Program, RuntimeError, function::CompiledFunction};
+use super::{RuntimeError, function::CompiledFunction};
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -37,7 +37,7 @@ fn approx_eq(a: f64, b: f64) -> bool {
 
 impl Value {
     pub fn try_apply(&self, op: Op, rhs: Option<&Value>) -> Result<Value, RuntimeError> {
-        match (self, rhs, op) {
+        match (self, rhs, op.clone()) {
             (Value::Number(lhs), Some(Value::Number(rhs)), Op::Add) => Ok(Value::Number(lhs + rhs)),
             (Value::Number(lhs), Some(Value::Number(rhs)), Op::Sub) => Ok(Value::Number(lhs - rhs)),
             (Value::Number(lhs), Some(Value::Number(rhs)), Op::Mul) => Ok(Value::Number(lhs * rhs)),
@@ -87,7 +87,9 @@ impl Value {
 
             (Value::Number(lhs), None, Op::Neg) => Ok(Value::Number(-lhs)),
 
-            _ => Err(RuntimeError::TypeMismatch),
+            _ => Err(RuntimeError::TypeError(format!(
+                "Cant {op:?} {self:?} and {rhs:?}"
+            ))),
         }
     }
 
@@ -111,6 +113,20 @@ impl Value {
     pub fn as_number(&self) -> Option<f64> {
         match self {
             Value::Number(n) => Some(*n),
+            _ => None,
+        }
+    }
+
+    pub fn as_function(&self) -> Option<&CompiledFunction> {
+        match self {
+            Value::Function(f) => Some(f),
+            _ => None,
+        }
+    }
+
+    pub fn to_function(self) -> Option<CompiledFunction> {
+        match self {
+            Value::Function(f) => Some(f),
             _ => None,
         }
     }
