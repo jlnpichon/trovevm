@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::core::ast::Literal;
 
 use super::{RuntimeError, function::CompiledFunction};
@@ -158,5 +160,17 @@ impl From<&Literal> for Value {
 impl From<&str> for Value {
     fn from(value: &str) -> Self {
         Value::String(value.to_string())
+    }
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::Number(n) => write!(f, "{n}"),
+            Value::String(s) => write!(f, "{s}"),
+            Value::Bool(b) => write!(f, "{b}"),
+            Value::Null => write!(f, "Null"),
+            Value::Function(function) => write!(f, "<fn {}/{}>", function.name, function.arity),
+        }
     }
 }

@@ -36,7 +36,7 @@ if_stmt = { IF_KW ~ LPAREN ~ expr ~ RPAREN ~ block ~ (ELSE_KW ~ block)? }
 
 while_stmt = { WHILE_KW ~ LPAREN ~ expr ~ RPAREN ~ block }
 
-return_stmt = { RETURN_KW ~ expr ~ SEMICOLON }
+return_stmt = { RETURN_KW ~ expr? ~ SEMICOLON }
 
 // ---- Expressions ----
 expr = { unary_op? ~ unary_expr ~ (bin_op ~ unary_op? ~ unary_expr)* }
@@ -75,10 +75,21 @@ BOOL    = @{ "true" | "false" }
 HEXADDR = @{ "0x" ~ HEX_DIGIT+ }
 
 // ---- Terminals ----
-Identifier = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+Identifier = @{ !KEYWORD ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
 String     = @{ ("\"" ~ dquoted* ~ "\"") | ("'" ~ squoted* ~ "'") }
 
 // ---- Keywords ---
+KEYWORD     = @{
+    CONTRACT_KW
+  | ELSE_KW
+  | FN_KW
+  | FOR_KW
+  | IF_KW
+  | LET_KW
+  | RETURN_KW
+  | WHILE_KW
+  | NULL_KW
+}
 CONTRACT_KW = @{ "contract" }
 ELSE_KW     = @{ "else" }
 FN_KW       = @{ "fn" }

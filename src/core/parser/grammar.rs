@@ -49,7 +49,7 @@ pub fn accept_rule<'i>(
     None
 }
 
-pub fn peek_rule(pairs: &mut pest::iterators::Pairs<'_, Rule>, expected: Rule) -> bool {
+pub fn peek_rule(pairs: &pest::iterators::Pairs<'_, Rule>, expected: Rule) -> bool {
     pairs
         .peek()
         .map(|p| p.as_rule() == expected)
@@ -100,9 +100,13 @@ fn expr_statement(mut pairs: pest::iterators::Pairs<Rule>) -> Result<Statement, 
 
 fn return_statement(mut pairs: pest::iterators::Pairs<Rule>) -> Result<Statement, PestError> {
     expect_rule(&mut pairs, Rule::RETURN_KW)?;
-    Ok(Statement::Return(expr(
-        &mut pairs.next().unwrap().into_inner(),
-    )?))
+
+    let mut xpr = None;
+    if !peek_rule(&pairs, Rule::SEMICOLON) {
+        xpr = Some(expr(&mut pairs.next().unwrap().into_inner())?);
+    }
+
+    Ok(Statement::Return(xpr))
 }
 
 fn if_statement(mut pairs: pest::iterators::Pairs<Rule>) -> Result<Statement, PestError> {

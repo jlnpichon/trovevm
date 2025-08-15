@@ -43,6 +43,8 @@ pub enum RuntimeError {
     NoCallFrame,
     #[error("ip is out of bounds")]
     OutOfBoundsIp,
+    #[error("wrong number of arguments: expected {0}, got {1}")]
+    WrongArgCount(usize, usize),
 }
 
 impl Default for VM {
@@ -72,22 +74,37 @@ impl VM {
         self.stack.last()
     }
 
+    pub fn stack_len(&self) -> Result<usize, RuntimeError> {
+        let frame = self.frames.last().ok_or(RuntimeError::NoCallFrame)?;
+        Ok(self.stack.len() - frame.base)
+    }
+
+    pub fn stack_peek_from_top(&self, offset: usize) -> Result<&Value, RuntimeError> {
+        let index = self
+            .stack
+            .len()
+            .checked_sub(1 + offset)
+            .ok_or(RuntimeError::StackUnderflow)?;
+        self.stack
+            .get(index)
+            .ok_or(RuntimeError::StackIndexOutOfBound(index))
+    }
+
     pub fn stack_peek(&self, index: usize) -> Result<&Value, RuntimeError> {
         let frame = self.frames.last().ok_or(RuntimeError::NoCallFrame)?;
-
         self.stack
-            .get(frame.base + index)
+            .get(frame.base + index + 1)
             .ok_or(RuntimeError::StackIndexOutOfBound(index))
     }
 
     pub fn stack_set(&mut self, index: usize, value: Value) -> Result<(), RuntimeError> {
         let frame = self.frames.last().ok_or(RuntimeError::NoCallFrame)?;
 
-        if let Some(slot) = self.stack.get_mut(frame.base + index) {
+        if let Some(slot) = self.stack.get_mut(frame.base + index + 1) {
             *slot = value;
             Ok(())
         } else {
-            Err(RuntimeError::StackIndexOutOfBound(frame.base + index))
+            Err(RuntimeError::StackIndexOutOfBound(frame.base + index + 1))
         }
     }
 
@@ -253,12 +270,22 @@ impl VM {
                     continue;
                 }
 
-                Opcode::Call => {
-                    let function = self.pop()?.to_function().ok_or(RuntimeError::TypeError(
-                        "Can only call function or class".into(),
-                    ))?;
+                Opcode::Call(args_count) => {
+                    let function = self
+                        .stack_peek_from_top(args_count)?
+                        .clone()
+                        .to_function()
+                        .ok_or(RuntimeError::TypeError(
+                            "Can only call function or class".into(),
+                        ))?;
                     let arity = function.arity;
+                    if arity != args_count {
+                        return Err(RuntimeError::WrongArgCount(arity, args_count));
+                    }
                     self.call(function, arity);
+
+                    // do not increment ip
+                    continue;
                 }
                 Opcode::Return => {
                     let return_value = if self.stack.len() > 1 {
@@ -266,13 +293,17 @@ impl VM {
                     } else {
                         Value::Null
                     };
-                    let frame = self.frames.pop().ok_or(RuntimeError::NoCallFrame);
 
-                    if self.frames.is_empty() {
+                    if self.frames.len() > 1 {
+                        let frame = self.frames.pop().ok_or(RuntimeError::NoCallFrame)?;
+                        let pop_count = self.stack.len() - frame.base;
+                        for _ in 0..pop_count {
+                            self.pop()?;
+                        }
+                        self.push(return_value);
+                    } else {
                         self.pop()?; // main function
                         return Ok(return_value);
-                    } else {
-                        todo!()
                     }
                 }
             }
@@ -287,7 +318,7 @@ fn trace(ip: usize, opcode: &Opcode, stack: &[Value]) {
     let op_str = format!("{:?}", opcode).yellow().to_string();
     let stack_str = stack
         .iter()
-        .map(|v| format!("{:?}", v).red().to_string())
+        .map(|v| format!("{}", v).red().to_string())
         .collect::<Vec<_>>()
         .join(", ");
     let ip_str = format!("IP={:02}", ip).bright_blue().to_string();

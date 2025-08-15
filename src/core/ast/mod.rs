@@ -20,7 +20,7 @@ pub enum Statement {
     FnDecl(Function),
     VarDecl(Var),
     Block(Vec<Statement>),
-    Return(Expr),
+    Return(Option<Expr>),
     Expr(Expr),
     If {
         condition: Expr,

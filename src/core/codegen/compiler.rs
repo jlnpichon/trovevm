@@ -54,7 +54,7 @@ impl Compiler {
     }
 
     pub fn end(mut self) -> Result<CompiledFunction, CompileError> {
-        self.emit_opcode(Opcode::Return);
+        self.emit_return();
         Ok(self.function)
     }
 
@@ -68,7 +68,7 @@ impl Compiler {
         // Pop all the local variables
         while let Some(local) = self.locals.last() {
             match local.depth {
-                Some(d) if d > self.scope_depth && !local.is_function => {
+                Some(d) if d > self.scope_depth => {
                     self.emit_opcode(Opcode::Pop);
                     self.locals.pop();
                 }
@@ -77,7 +77,7 @@ impl Compiler {
         }
     }
 
-    fn add_local(&mut self, name: &str, is_function: bool) -> Result<usize, CompileError> {
+    fn add_local(&mut self, name: &str) -> Result<usize, CompileError> {
         if self.locals.len() > MAX_LOCAL_VARS {
             return Err(CompileError::TooManyLocalVars);
         }
@@ -96,7 +96,6 @@ impl Compiler {
         self.locals.push(Local {
             name: name.to_string(),
             depth: None,
-            is_function,
         });
 
         Ok(self.locals.len() - 1)
@@ -105,7 +104,7 @@ impl Compiler {
     fn resolve_local(&self, name: &str) -> Result<Option<usize>, CompileError> {
         for (i_rev, local) in self.locals.iter().rev().enumerate() {
             if name == local.name {
-                if local.depth.is_some() || local.is_function {
+                if local.depth.is_some() {
                     let index = self.locals.len() - 1 - i_rev;
                     return Ok(Some(index));
                 } else {
@@ -120,14 +119,21 @@ impl Compiler {
         self.function.program.define_constant(value)
     }
 
-    fn define_global(&mut self, name: &Identifier) {
-        self.function.program.define_global(name);
+    fn define_global(&mut self, name: &Identifier) -> usize {
+        self.function.program.define_global(name)
     }
 
     fn emit_opcode(&mut self, opcode: Opcode) {
         self.function.program.emit_opcode(opcode);
     }
 
+    fn emit_return(&mut self) {
+        if self.scope_depth > 0 {
+            let index = self.define_constant(Value::Null);
+            self.emit_opcode(Opcode::Push(index));
+        }
+        self.emit_opcode(Opcode::Return);
+    }
     fn emit_jump(&mut self, jump: Opcode) -> usize {
         self.function.program.emit_jump(jump)
     }
@@ -178,7 +184,12 @@ impl Visitor for Compiler {
                 self.end_scope();
             }
             Statement::Return(expr) => {
-                expr.accept(self);
+                if let Some(expr) = expr {
+                    expr.accept(self);
+                    self.emit_opcode(Opcode::Return);
+                } else {
+                    self.emit_return();
+                }
             }
             Statement::Expr(expr) => {
                 expr.accept(self);
@@ -312,7 +323,7 @@ impl Visitor for Compiler {
                     arg.accept(self);
                 }
 
-                self.emit_opcode(Opcode::Call);
+                self.emit_opcode(Opcode::Call(args.len()));
             }
             Expr::Unary { op, expr } => {
                 expr.accept(self);
@@ -375,7 +386,7 @@ impl Visitor for Compiler {
 
     fn visit_var_decl(&mut self, v: &Var) {
         if self.scope_depth > 0 {
-            self.add_local(&v.name, false).expect("add_local");
+            self.add_local(&v.name).expect("add_local");
         }
 
         if let Some(initializer) = &v.initializer {
@@ -405,7 +416,7 @@ impl Visitor for Compiler {
 
         compiler.begin_scope();
         for param in &f.params {
-            compiler.add_local(param, false).expect("add_local");
+            compiler.add_local(param).expect("add_local");
             compiler.mark_initialized();
         }
 
@@ -417,10 +428,15 @@ impl Visitor for Compiler {
         func_obj.arity = f.params.len();
 
         let index = self.define_constant(Value::Function(func_obj));
+
         if self.scope_depth == 0 {
-            self.emit_opcode(Opcode::DefineGlobal(index));
+            self.emit_opcode(Opcode::Push(index));
+            let name_index = self.define_constant(Value::String(f.name.to_string()));
+            self.emit_opcode(Opcode::DefineGlobal(name_index));
         } else {
-            self.add_local(&f.name, true).expect("add_local");
+            self.add_local(&f.name).expect("add_local");
+            self.mark_initialized();
+            self.emit_opcode(Opcode::Push(index));
             self.emit_opcode(Opcode::SetLocal(index));
         }
     }

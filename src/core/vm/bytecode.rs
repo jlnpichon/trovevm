@@ -33,7 +33,7 @@ pub enum Opcode {
     JumpIfFalse(usize),
     JumpBack(usize),
 
-    Call,
+    Call(usize),
     Return,
 }
 
@@ -97,9 +97,10 @@ impl Program {
         self.current_opcode_index() - 1
     }
 
-    pub fn define_global(&mut self, name: &Identifier) {
+    pub fn define_global(&mut self, name: &Identifier) -> usize {
         let index = self.define_constant(Value::String(name.to_string()));
         self.emit_opcode(Opcode::DefineGlobal(index));
+        index
     }
 
     pub fn len(&self) -> usize {

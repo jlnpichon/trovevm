@@ -11,7 +11,6 @@ pub struct CompiledFunction {
 pub struct Local {
     pub name: String,
     pub depth: Option<usize>,
-    pub is_function: bool,
 }
 
 #[derive(Debug, Clone)]
