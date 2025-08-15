@@ -15,4 +15,5 @@ pub enum ArgsCommand {
     Compile { input: String },
     Parse { input: String },
     Run { input: String },
+    Eval { input: String },
 }

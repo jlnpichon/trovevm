@@ -17,11 +17,5 @@ pub enum EvalError {
 }
 
 pub fn eval(input: InputSource) -> Result<Value, EvalError> {
-    let source = input.read_to_string()?;
-    let ast = core::parser::parse_program(input.source_name(), &source).map_err(EvalError::from)?;
-    let function =
-        core::codegen::compile(&ast.statements).map_err(|e| EvalError::Compile(e.into()))?;
-
-    let mut vm = core::vm::VM::new();
-    vm.eval(function).map_err(|e| EvalError::Runtime(e.into()))
+    todo!()
 }

@@ -62,19 +62,21 @@ impl Compiler {
         self.scope_depth += 1;
     }
 
-    pub fn end_scope(&mut self) {
-        self.scope_depth -= 1;
-
-        // Pop all the local variables
+    fn pop_locals(&mut self) {
         while let Some(local) = self.locals.last() {
             match local.depth {
-                Some(d) if d > self.scope_depth => {
+                Some(d) if d >= self.scope_depth => {
                     self.emit_opcode(Opcode::Pop);
                     self.locals.pop();
                 }
                 _ => break,
             }
         }
+    }
+
+    pub fn end_scope(&mut self) {
+        self.pop_locals();
+        self.scope_depth -= 1;
     }
 
     fn add_local(&mut self, name: &str) -> Result<usize, CompileError> {
@@ -186,8 +188,10 @@ impl Visitor for Compiler {
             Statement::Return(expr) => {
                 if let Some(expr) = expr {
                     expr.accept(self);
+                    self.pop_locals();
                     self.emit_opcode(Opcode::Return);
                 } else {
+                    self.pop_locals();
                     self.emit_return();
                 }
             }
@@ -266,6 +270,7 @@ impl Visitor for Compiler {
                     self.patch_jump(exit_jump, current - exit_jump);
                 }
 
+                self.emit_opcode(Opcode::Pop); // condition
                 self.end_scope();
             }
             Statement::While { condition, body } => {

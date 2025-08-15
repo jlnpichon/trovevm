@@ -371,8 +371,9 @@ fn test_for() {
             //
             // end
             Opcode::Pop, // condition
+            Opcode::Pop, // local variable i
             Opcode::Push(4),
-            Opcode::Pop,
+            Opcode::Pop, // variable  "a string"
             Opcode::Return,
         ],
         &[

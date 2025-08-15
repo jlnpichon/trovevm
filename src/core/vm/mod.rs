@@ -170,20 +170,7 @@ impl VM {
     }
 
     pub fn eval(&mut self, function: CompiledFunction) -> Result<Value, RuntimeError> {
-        let function_obj = Value::Function(function.clone());
-        self.push(function_obj);
-        let frame = CallFrame {
-            function,
-            ip: 0,
-            base: self.stack.len(),
-        };
-        self.frames.push(frame);
-
-        let result = self.run_loop()?;
-
-        self.frames.pop();
-
-        Ok(result)
+        todo!()
     }
 
     fn run_loop(&mut self) -> Result<Value, RuntimeError> {

@@ -16,6 +16,7 @@ pub enum ConfigCommand {
     Compile { input: InputSource },
     Parse { input: InputSource },
     Run { input: InputSource },
+    Eval { input: InputSource },
 }
 
 impl TryFrom<Args> for Config {
@@ -43,6 +44,9 @@ impl TryFrom<ArgsCommand> for ConfigCommand {
                 input: InputSource::from(input),
             },
             ArgsCommand::Run { input } => ConfigCommand::Run {
+                input: InputSource::from(input),
+            },
+            ArgsCommand::Eval { input } => ConfigCommand::Eval {
                 input: InputSource::from(input),
             },
         })
