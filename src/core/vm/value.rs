@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::core::ast::Literal;
+use crate::core::{ast::Literal, vm::function::CompiledFunctionKind};
 
 use super::{RuntimeError, function::CompiledFunction};
 
@@ -170,7 +170,13 @@ impl fmt::Display for Value {
             Value::String(s) => write!(f, "{s}"),
             Value::Bool(b) => write!(f, "{b}"),
             Value::Null => write!(f, "Null"),
-            Value::Function(function) => write!(f, "<fn {}/{}>", function.name, function.arity),
+            Value::Function(function) => {
+                write!(
+                    f,
+                    "<{} {}/{}>",
+                    function.kind, function.name, function.arity
+                )
+            }
         }
     }
 }

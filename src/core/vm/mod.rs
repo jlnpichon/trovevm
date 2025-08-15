@@ -1,9 +1,12 @@
 pub mod bytecode;
 pub mod function;
+pub mod native;
 pub mod value;
 
 use function::CallFrame;
 use function::CompiledFunction;
+use function::CompiledFunctionKind;
+use native::install_natives;
 use std::collections::HashMap;
 use tracing::trace;
 
@@ -55,9 +58,12 @@ impl Default for VM {
 
 impl VM {
     pub fn new() -> Self {
+        let mut globals = HashMap::new();
+        install_natives(&mut globals);
+
         Self {
             stack: Vec::with_capacity(1024),
-            globals: HashMap::new(),
+            globals,
             frames: vec![],
         }
     }
@@ -130,24 +136,39 @@ impl VM {
             .last()
             .ok_or(RuntimeError::NoCallFrame)?
             .function
-            .program)
+            .program())
     }
 
     fn constant_get(&self, index: usize) -> Result<&Value, RuntimeError> {
         let frame = self.frames.last().ok_or(RuntimeError::NoCallFrame)?;
         frame
             .function
-            .program
+            .program()
             .constant_get(index)
             .ok_or(RuntimeError::InvalidConstantIndex(index))
     }
 
-    fn call(&mut self, function: CompiledFunction, args: usize) {
-        self.frames.push(CallFrame {
-            function,
-            ip: 0,
-            base: self.stack.len() - args - 1,
-        });
+    fn call(&mut self, function: CompiledFunction, args: usize) -> Result<(), RuntimeError> {
+        match function.kind {
+            CompiledFunctionKind::Bytecode(_) => {
+                self.frames.push(CallFrame {
+                    function,
+                    ip: 0,
+                    base: self.stack.len() - args - 1,
+                });
+            }
+            CompiledFunctionKind::Native(native) => {
+                let value = native(self, &[])?;
+                for _ in 0..args {
+                    self.pop()?;
+                }
+                self.pop()?; // native function object
+                self.push(value);
+                *self.ip_mut()? += 1;
+            }
+        };
+
+        Ok(())
     }
 
     fn read_opcode(&self) -> Result<Opcode, RuntimeError> {
@@ -286,7 +307,8 @@ impl VM {
                     if arity != args_count {
                         return Err(RuntimeError::WrongArgCount(arity, args_count));
                     }
-                    self.call(function, arity);
+
+                    self.call(function, arity)?;
 
                     // do not increment ip
                     continue;

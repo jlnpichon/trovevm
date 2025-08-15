@@ -118,15 +118,15 @@ impl Compiler {
     }
 
     fn define_constant(&mut self, value: Value) -> usize {
-        self.function.program.define_constant(value)
+        self.function.program_mut().define_constant(value)
     }
 
     fn define_global(&mut self, name: &Identifier) -> usize {
-        self.function.program.define_global(name)
+        self.function.program_mut().define_global(name)
     }
 
     fn emit_opcode(&mut self, opcode: Opcode) {
-        self.function.program.emit_opcode(opcode);
+        self.function.program_mut().emit_opcode(opcode);
     }
 
     fn emit_return(&mut self) {
@@ -137,23 +137,23 @@ impl Compiler {
         self.emit_opcode(Opcode::Return);
     }
     fn emit_jump(&mut self, jump: Opcode) -> usize {
-        self.function.program.emit_jump(jump)
+        self.function.program_mut().emit_jump(jump)
     }
 
     fn current_opcode_index(&self) -> usize {
-        self.function.program.current_opcode_index()
+        self.function.program().current_opcode_index()
     }
 
     fn patch_jump(&mut self, index: usize, offset: usize) {
-        self.function.program.patch_jump(index, offset);
+        self.function.program_mut().patch_jump(index, offset);
     }
 
     fn emit_constant(&mut self, value: Value) {
-        self.function.program.emit_constant(value);
+        self.function.program_mut().emit_constant(value);
     }
 
     fn emit_null(&mut self) {
-        self.function.program.emit_null();
+        self.function.program_mut().emit_null();
     }
 
     fn mark_initialized(&mut self) {
