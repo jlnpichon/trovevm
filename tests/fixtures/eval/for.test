@@ -1,0 +1,10 @@
+==INPUT==
+let count = 1;
+
+for (let i=0; i <= 10; i=i+1) {
+  count = count * 2;
+}
+
+return count;
+==EXPECTED==
+Null

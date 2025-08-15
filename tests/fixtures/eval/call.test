@@ -1,0 +1,5 @@
+==INPUT==
+fn add(a, b) { return a + b; }
+return add(20, 22);
+==EXPECTED==
+42

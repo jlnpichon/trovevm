@@ -1,0 +1,5 @@
+==INPUT==
+let x = 42;
+return x;
+==EXPECTED==
+42

@@ -193,11 +193,7 @@ impl Visitor for Compiler {
             }
             Statement::Expr(expr) => {
                 expr.accept(self);
-                // Do not pop after a call, the return implicitly pop the stack
-                match expr {
-                    Expr::FnCall { .. } => (),
-                    _ => self.emit_opcode(Opcode::Pop),
-                }
+                self.emit_opcode(Opcode::Pop);
             }
             Statement::If {
                 condition,

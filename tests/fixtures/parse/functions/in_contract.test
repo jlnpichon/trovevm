@@ -24,15 +24,17 @@ Program {
                         body: Block(
                             [
                                 Return(
-                                    Binary {
-                                        op: Multiply,
-                                        lhs: Variable(
-                                            "x",
-                                        ),
-                                        rhs: Variable(
-                                            "x",
-                                        ),
-                                    },
+                                    Some(
+                                        Binary {
+                                            op: Multiply,
+                                            lhs: Variable(
+                                                "x",
+                                            ),
+                                            rhs: Variable(
+                                                "x",
+                                            ),
+                                        },
+                                    ),
                                 ),
                             ],
                         ),

@@ -14,9 +14,11 @@ Program {
                 body: Block(
                     [
                         Return(
-                            Literal(
-                                Number(
-                                    1.0,
+                            Some(
+                                Literal(
+                                    Number(
+                                        1.0,
+                                    ),
                                 ),
                             ),
                         ),

@@ -5,7 +5,7 @@ use anyhow::Result;
 use ariadne::Source;
 use cli::{
     Args, Config, ConfigCommand,
-    commands::{self, CompileCommandError, ParseCommandError},
+    commands::{self, CompileCommandError, ParseCommandError, RunError},
     init_logging,
 };
 
@@ -42,10 +42,21 @@ fn main() -> Result<()> {
                 std::process::exit(1);
             }
         },
-        ConfigCommand::Run { input } => {
-            let value = commands::run(input)?;
-            println!("{value:?}");
-        }
+        ConfigCommand::Run { input } => match commands::run(input) {
+            Ok(result) => println!("{result}"),
+            Err(err) => {
+                match err {
+                    RunError::Input(e) => eprintln!("{e}"),
+                    RunError::Parse(e) => e
+                        .report()
+                        .eprint((&e.source_name, Source::from(&e.source_code)))
+                        .unwrap(),
+                    RunError::Compile(e) => eprintln!("{e}"),
+                    RunError::Runtime(e) => eprintln!("{e}"),
+                };
+                std::process::exit(1);
+            }
+        },
     };
 
     Ok(())

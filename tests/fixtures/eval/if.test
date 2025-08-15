@@ -1,0 +1,9 @@
+==INPUT==
+let x = true;
+if (x) {
+  return 42;
+} else {
+  return 52;
+}
+==EXPECTED==
+42

@@ -1,0 +1,4 @@
+==INPUT==
+return 42;
+==EXPECTED==
+42
