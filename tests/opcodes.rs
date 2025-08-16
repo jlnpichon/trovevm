@@ -2,7 +2,7 @@ use trovevm::core::vm::{Opcode, RuntimeError, VM, Value, function::CompiledFunct
 
 fn run_program<const N: usize>(bytecode: &[Opcode; N], constants: Vec<Value>) -> Value {
     let function = CompiledFunction::from((bytecode, constants));
-    let mut vm = VM::new();
+    let mut vm = VM::default();
     vm.run(function.clone()).expect("run the program")
 }
 
@@ -144,7 +144,7 @@ fn test_invalid_constant_index() {
         &[Opcode::Push(100), Opcode::Return],
         vec![Value::Number(1.0)],
     ));
-    let mut vm = VM::new();
+    let mut vm = VM::default();
     let result = vm.run(function);
     assert!(matches!(
         result,
@@ -163,7 +163,7 @@ fn test_division_by_zero() {
         ],
         vec![Value::Number(1.0), Value::Number(0.0)],
     ));
-    let mut vm = VM::new();
+    let mut vm = VM::default();
     let result = vm.run(function);
     assert!(matches!(result, Err(RuntimeError::DivisionByZero)));
 }

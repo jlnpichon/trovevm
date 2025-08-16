@@ -210,7 +210,7 @@ fn block(mut pairs: pest::iterators::Pairs<Rule>) -> Result<Statement, PestError
     expect_rule(&mut pairs, Rule::LBRACE)?;
 
     let mut statements = vec![];
-    while !peek_rule(&mut pairs, Rule::RBRACE) {
+    while !peek_rule(&pairs, Rule::RBRACE) {
         let pair = pairs.next().unwrap();
         statements.push(decl(pair)?);
     }

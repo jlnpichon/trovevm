@@ -22,6 +22,6 @@ pub fn run(input: InputSource) -> Result<Value, RunError> {
     let function =
         core::codegen::compile(&ast.statements).map_err(|e| RunError::Compile(e.into()))?;
 
-    let mut vm = core::vm::VM::new();
+    let mut vm = core::vm::VM::default();
     vm.run(function).map_err(|e| RunError::Runtime(e.into()))
 }

@@ -1,14 +1,20 @@
 pub mod bytecode;
+pub mod contract;
 pub mod function;
 pub mod native;
+pub mod storage;
 pub mod value;
+pub mod world_state;
 
+use contract::ContractInstance;
 use function::CallFrame;
 use function::CompiledFunction;
 use function::CompiledFunctionKind;
 use native::install_natives;
 use std::collections::HashMap;
+use storage::Address;
 use tracing::trace;
+use world_state::WorldState;
 
 // Re-exports
 pub use bytecode::Opcode;
@@ -17,11 +23,12 @@ pub use value::Value;
 
 use value::Op;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct VM {
     stack: Vec<Value>, // TODO: limit
     globals: HashMap<String, Value>,
     frames: Vec<CallFrame>, // TODO: limit
+    world_state: WorldState,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -48,16 +55,12 @@ pub enum RuntimeError {
     OutOfBoundsIp,
     #[error("wrong number of arguments: expected {0}, got {1}")]
     WrongArgCount(usize, usize),
-}
-
-impl Default for VM {
-    fn default() -> Self {
-        Self::new()
-    }
+    #[error("no contract definition found for the given address")]
+    ContractNotFound,
 }
 
 impl VM {
-    pub fn new() -> Self {
+    pub fn new(world_state: WorldState) -> Self {
         let mut globals = HashMap::new();
         install_natives(&mut globals);
 
@@ -65,7 +68,61 @@ impl VM {
             stack: Vec::with_capacity(1024),
             globals,
             frames: vec![],
+            world_state,
         }
+    }
+
+    pub fn deploy(
+        &mut self,
+        sender: Address,
+        contract_address: Address,
+        args: Vec<Value>,
+    ) -> Result<ContractInstance, RuntimeError> {
+        let contract = self
+            .world_state
+            .registry
+            .get(&contract_address)
+            .ok_or(RuntimeError::ContractNotFound)?;
+
+        let instance_address = self.world_state.generate_address(sender);
+        let mut instance = ContractInstance::new(
+            instance_address,
+            contract.clone(),
+            self.world_state.storage.clone(),
+        );
+        self.world_state
+            .storage
+            .0
+            .borrow_mut()
+            .init_instance(instance_address);
+
+        if contract.methods.contains_key("init") {
+            instance.call_method(self, "init", args)?;
+        }
+
+        Ok(instance)
+    }
+
+    fn run_transaction(
+        &mut self,
+        caller: Address,
+        instance: &mut ContractInstance,
+        method: &str,
+        args: Vec<Value>,
+    ) -> Result<Value, RuntimeError> {
+        self.globals
+            .insert("caller".to_string(), Value::String(caller.to_string()));
+        /* TODO:
+                self.globals
+                    .insert("msg_value".to_string(), Value::String());
+                self.globals
+                    .insert("block_number".to_string(), Value::String());
+                self.globals
+                    .insert("gas_left".to_string(), Value::String());
+
+        */
+
+        instance.call_method(self, method, args)
     }
 
     pub fn push(&mut self, value: Value) {
@@ -131,7 +188,7 @@ impl VM {
     }
 
     pub fn program(&self) -> Result<&Program, RuntimeError> {
-        Ok(&self
+        Ok(self
             .frames
             .last()
             .ok_or(RuntimeError::NoCallFrame)?
@@ -185,7 +242,7 @@ impl VM {
         let function_obj = Value::Function(function.clone());
         self.push(function_obj);
 
-        self.call(function, 0);
+        self.call(function, 0)?;
 
         self.run_loop()
     }

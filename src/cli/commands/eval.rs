@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use crate::cli::input::{InputError, InputSource};
 use crate::core::vm::{RuntimeError, Value};
-use crate::core::{self, codegen::CompileError, parser::error::ParseErrorWithContext};
+use crate::core::{codegen::CompileError, parser::error::ParseErrorWithContext};
 
 #[derive(Debug, thiserror::Error)]
 pub enum EvalError {

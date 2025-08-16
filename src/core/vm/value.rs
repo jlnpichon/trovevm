@@ -1,8 +1,8 @@
 use std::fmt;
 
-use crate::core::{ast::Literal, vm::function::CompiledFunctionKind};
+use crate::core::ast::Literal;
 
-use super::{RuntimeError, function::CompiledFunction};
+use super::{RuntimeError, contract::ContractInstance, function::CompiledFunction};
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -11,6 +11,7 @@ pub enum Value {
     Bool(bool),
     Null,
     Function(CompiledFunction),
+    ContractInstance(ContractInstance),
 }
 
 #[derive(Debug, Clone)]
@@ -101,6 +102,7 @@ impl Value {
             Value::String(s) => !s.is_empty(),
             Value::Bool(b) => *b,
             Value::Function(_) => true,
+            Value::ContractInstance(_) => true,
             Value::Null => false,
         }
     }
@@ -177,6 +179,11 @@ impl fmt::Display for Value {
                     function.kind, function.name, function.arity
                 )
             }
+            Value::ContractInstance(instance) => write!(
+                f,
+                "<contract {}@{:?}>",
+                instance.contract.name, instance.address
+            ),
         }
     }
 }

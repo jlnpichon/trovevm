@@ -1,5 +1,4 @@
 use crate::cli::input::{InputError, InputSource};
-use crate::core::vm::Program;
 use crate::core::vm::function::CompiledFunction;
 use crate::core::{self, codegen::CompileError, parser::error::ParseErrorWithContext};
 
