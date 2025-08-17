@@ -1,0 +1,17 @@
+[package]
+name = "trove-vm"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+trove-core = { path = "../core" }
+
+owo-colors = "4.2.2"
+tracing = "0.1.41"
+
+[dev-dependencies]
+trovec = { path = "../compiler/" }
+
+ariadne = "0.5.1"
+globwalk = "0.9.1"
+pretty_assertions = "1.4.1"

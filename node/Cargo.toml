@@ -1,0 +1,9 @@
+[package]
+name = "trove-node"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+trove-core = { path = "../core" }
+trovec = { path = "../compiler" }
+trove-vm = { path = "../vm" }
