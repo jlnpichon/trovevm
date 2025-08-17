@@ -10,12 +10,18 @@ use trove_core::{
 
 use crate::{function::CallFrame, native::install_natives};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct VM {
     stack: Vec<Value>, // TODO: limit
     globals: HashMap<String, Value>,
     frames: Vec<CallFrame>, // TODO: limit
     world_state: WorldState,
+}
+
+impl Default for VM {
+    fn default() -> Self {
+        Self::new(WorldState::default())
+    }
 }
 
 impl VM {
