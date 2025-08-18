@@ -43,7 +43,7 @@ expr = { unary_op? ~ unary_expr ~ (bin_op ~ unary_op? ~ unary_expr)* }
 
 unary_expr = { (Literal | Identifier | grouped_expr) ~ call_suffix* }
 
-call_suffix = { LPAREN ~ args? ~ RPAREN }
+call_suffix = { (LPAREN ~ args? ~ RPAREN) | DOT ~ Identifier }
 
 grouped_expr = { "(" ~ expr ~ ")" }
 
@@ -101,6 +101,7 @@ WHILE_KW    = @{ "while" }
 NULL_KW     = @{ "null" }
 
 // ---- Symbols ----
+DOT       = @{ "." }
 LPAREN    = @{ "(" }
 RPAREN    = @{ ")" }
 LBRACE    = @{ "{" }

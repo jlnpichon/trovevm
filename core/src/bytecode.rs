@@ -26,6 +26,8 @@ pub enum Opcode {
     SetGlobal(usize),
     GetLocal(usize),
     SetLocal(usize),
+    GetField(usize),
+    SetField(usize),
 
     Jump(usize),
     JumpIfFalse(usize),

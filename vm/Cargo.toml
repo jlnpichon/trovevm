@@ -8,6 +8,7 @@ trove-core = { path = "../core" }
 
 owo-colors = "4.2.2"
 tracing = "0.1.41"
+tokio = { version = "1.47.1", features = ["sync"], optional = true }
 
 [dev-dependencies]
 trovec = { path = "../compiler/" }
@@ -15,3 +16,7 @@ trovec = { path = "../compiler/" }
 ariadne = "0.5.1"
 globwalk = "0.9.1"
 pretty_assertions = "1.4.1"
+
+[features]
+default = []
+tokio-async = []

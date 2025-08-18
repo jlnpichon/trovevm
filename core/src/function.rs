@@ -16,7 +16,7 @@ pub enum CompiledFunctionKind {
     Native(Box<dyn Callable>),
 }
 
-pub trait Callable: std::fmt::Debug {
+pub trait Callable: std::fmt::Debug + Send + Sync {
     fn call(&self, args: &[Value], context: &mut dyn ExecContext) -> Result<Value, RuntimeError>;
     fn clone_box(&self) -> Box<dyn Callable>;
 }

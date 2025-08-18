@@ -18,7 +18,7 @@ fn test_run() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
-        let function = match trovec::codegen::compile(&ast.statements) {
+        let compiled_program = match trovec::codegen::compile(&ast.statements) {
             Ok(function) => function,
             Err(err) => {
                 eprintln!("{err}");
@@ -27,7 +27,7 @@ fn test_run() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         let mut vm = trove_vm::VM::default();
-        if let Err(err) = vm.run(function) {
+        if let Err(err) = vm.run(compiled_program.script) {
             eprintln!("{err}");
             panic!("Test failed: parse error in {path:?}")
         }

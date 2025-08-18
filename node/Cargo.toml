@@ -4,6 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-trove-core = { path = "../core" }
+trove-core = { path = "../core", features = ["tokio-async"] }
 trovec = { path = "../compiler" }
-trove-vm = { path = "../vm" }
+trove-vm = { path = "../vm", features = ["tokio-async"] }
+
+jsonrpsee = { version = "0.26.0", features = ["server", "macros"] }
+tokio = { version = "1.47.1", features = ["full"] }
+anyhow = "1.0.99"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+tracing-error = "0.2.1"
+serde = { version = "1.0.219", features = ["serde_derive"] }

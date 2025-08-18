@@ -104,8 +104,8 @@ fn assert_program(
 }
 
 fn run_compiler(statements: &[Statement], bytecode: &[Opcode], constants: &[Value]) {
-    let function = compile(statements).expect("compile ast");
-    assert_program(&function, bytecode, constants);
+    let compiled_program = compile(statements).expect("compile ast");
+    assert_program(&compiled_program.script, bytecode, constants);
 }
 
 #[test]

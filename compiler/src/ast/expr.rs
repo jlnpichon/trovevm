@@ -8,6 +8,15 @@ pub enum Expr {
         target: Box<Expr>,
         value: Box<Expr>,
     },
+    Get {
+        object: Box<Expr>,
+        name: String,
+    },
+    Set {
+        object: Box<Expr>,
+        name: String,
+        value: Box<Expr>,
+    },
     FnCall {
         callee: Box<Expr>,
         args: Vec<Expr>,

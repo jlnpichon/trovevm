@@ -1,6 +1,9 @@
 use pest::pratt_parser::PrattParser;
 
-use crate::ast::{BinaryOp, Expr, Literal, UnaryOp};
+use crate::{
+    ast::{BinaryOp, Expr, Literal, UnaryOp},
+    parser::grammar::accept_rule,
+};
 
 use super::grammar::{PestError, Rule, expect_rule};
 
@@ -120,7 +123,7 @@ pub fn expr(pairs: &mut pest::iterators::Pairs<Rule>) -> Result<Expr, PestError>
             let mut inner = unary_expr.into_inner();
             let primary_expr = inner.next().unwrap();
 
-            let mut expr = match primary_expr.as_rule() {
+            let mut expression = match primary_expr.as_rule() {
                 Rule::Literal => literal(&mut primary_expr.into_inner())?,
                 Rule::grouped_expr => {
                     // Here we have grouped_expr { inner: [ expr { inner: [ unary_expr ] } ] }
@@ -145,19 +148,27 @@ pub fn expr(pairs: &mut pest::iterators::Pairs<Rule>) -> Result<Expr, PestError>
                 match suffix.as_rule() {
                     Rule::call_suffix => {
                         let mut inner = suffix.into_inner();
-                        expect_rule(&mut inner, Rule::LPAREN)?;
-                        let args = args(&mut inner)?;
-                        expr = Expr::FnCall {
-                            callee: Box::new(expr),
-                            args,
-                        };
-                        expect_rule(&mut inner, Rule::RPAREN)?;
+                        if accept_rule(&mut inner, Rule::DOT).is_some() {
+                            let name = expect_rule(&mut inner, Rule::Identifier)?;
+                            expression = Expr::Get {
+                                object: expression.into(),
+                                name: name.as_str().to_string(),
+                            };
+                        } else {
+                            expect_rule(&mut inner, Rule::LPAREN)?;
+                            let args = args(&mut inner)?;
+                            expression = Expr::FnCall {
+                                callee: Box::new(expression),
+                                args,
+                            };
+                            expect_rule(&mut inner, Rule::RPAREN)?;
+                        }
                     }
                     _ => panic!("unexpected suffix: {:?}", suffix.as_rule()),
                 }
             }
 
-            Ok(expr)
+            Ok(expression)
         })
         .map_prefix(|op, rhs| {
             Ok(Expr::Unary {
@@ -168,10 +179,17 @@ pub fn expr(pairs: &mut pest::iterators::Pairs<Rule>) -> Result<Expr, PestError>
         .map_infix(|lhs, op, rhs| {
             let rule = op.as_rule();
             if rule == Rule::EQ {
-                Ok(Expr::Assign {
-                    target: lhs?.into(),
-                    value: rhs?.into(),
-                })
+                match lhs? {
+                    Expr::Get { object, name } => Ok(Expr::Set {
+                        object,
+                        name,
+                        value: rhs?.into(),
+                    }),
+                    lhs => Ok(Expr::Assign {
+                        target: lhs.into(),
+                        value: rhs?.into(),
+                    }),
+                }
             } else {
                 Ok(Expr::Binary {
                     lhs: lhs?.into(),

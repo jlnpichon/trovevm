@@ -56,6 +56,24 @@ pub fn peek_rule(pairs: &pest::iterators::Pairs<'_, Rule>, expected: Rule) -> bo
         .unwrap_or(false)
 }
 
+fn contract_var_decl(mut pairs: pest::iterators::Pairs<Rule>) -> Result<Var, PestError> {
+    expect_rule(&mut pairs, Rule::LET_KW)?;
+    let name = pairs.next().unwrap().as_str().to_string();
+    if let Some(pair) = accept_rule(&mut pairs, Rule::EQ) {
+        return Err(Box::new(pest::error::Error::new_from_span(
+            pest::error::ErrorVariant::CustomError {
+                message: String::from("Initializer on class variable are forbidden"),
+            },
+            pair.as_span(),
+        )));
+    }
+
+    Ok(Var {
+        name: name.into(),
+        initializer: None,
+    })
+}
+
 fn var_decl(mut pairs: pest::iterators::Pairs<Rule>) -> Result<Var, PestError> {
     expect_rule(&mut pairs, Rule::LET_KW)?;
 
@@ -253,7 +271,7 @@ fn contract_decl(mut pairs: pest::iterators::Pairs<Rule>) -> Result<Contract, Pe
                 funcs.push(fn_decl(pair.into_inner())?);
             }
             Rule::var_decl => {
-                vars.push(var_decl(pair.into_inner())?);
+                vars.push(contract_var_decl(pair.into_inner())?);
             }
             Rule::RBRACE => break,
             r => {

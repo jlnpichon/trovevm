@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
-use super::{
-    address::Address,
-    contract::{Contract, SharedStorage},
-};
+use crate::storage::SharedStorage;
+
+use super::{address::Address, contract::Contract};
 
 #[derive(Debug, Clone, Default)]
 pub struct WorldState {

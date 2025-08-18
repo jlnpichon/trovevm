@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::ast::{
     BinaryOp, Contract, Expr, Function, Identifier, Literal, Statement, UnaryOp, Var, Visitor,
 };
@@ -27,8 +29,23 @@ pub struct Local {
 #[derive(Debug, Clone, Default)]
 pub struct Compiler {
     function: CompiledFunction,
+    functions: HashMap<String, CompiledFunction>,
+    contracts: HashMap<String, CompiledContract>,
     locals: Vec<Local>,
     scope_depth: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct CompiledContract {
+    name: String,
+    functions: HashMap<String, CompiledFunction>,
+    vars: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CompiledProgram {
+    pub contracts: HashMap<String, CompiledContract>,
+    pub script: CompiledFunction,
 }
 
 impl Compiler {
@@ -40,10 +57,10 @@ impl Compiler {
     }
 }
 
-pub fn compile(statements: &[Statement]) -> Result<CompiledFunction, CompileError> {
+pub fn compile(statements: &[Statement]) -> Result<CompiledProgram, CompileError> {
     let mut compiler = Compiler::new("script");
     compiler.compile(statements)?;
-    compiler.end()
+    Ok(compiler.end_program())
 }
 
 impl Compiler {
@@ -54,9 +71,28 @@ impl Compiler {
         Ok(())
     }
 
-    pub fn end(mut self) -> Result<CompiledFunction, CompileError> {
+    pub fn end_function(mut self) -> CompiledFunction {
         self.emit_return();
-        Ok(self.function)
+        self.function
+    }
+
+    pub fn end_program(self) -> CompiledProgram {
+        let contracts = self.contracts.clone();
+        let script = self.end_function();
+        CompiledProgram { contracts, script }
+    }
+
+    pub fn end_contract(mut self, name: &str, vars: Vec<String>) -> CompiledContract {
+        self.emit_return();
+        CompiledContract {
+            name: name.to_string(),
+            functions: std::mem::take(&mut self.functions),
+            vars,
+        }
+    }
+
+    pub fn function_map(&self) -> HashMap<String, CompiledFunction> {
+        self.functions.clone()
     }
 
     pub fn begin_scope(&mut self) {
@@ -304,6 +340,22 @@ impl Visitor for Compiler {
                     self.emit_opcode(Opcode::GetGlobal(index));
                 }
             }
+            Expr::Get { object, name } => {
+                self.visit_expr(object);
+                let index = self.define_constant(Value::String(name.clone()));
+                self.emit_opcode(Opcode::GetField(index));
+            }
+            Expr::Set {
+                object,
+                name,
+                value,
+            } => {
+                value.accept(self);
+                object.accept(self);
+
+                let index = self.define_constant(Value::String(name.clone()));
+                self.emit_opcode(Opcode::SetField(index));
+            }
             Expr::Assign { target, value } => {
                 value.accept(self);
 
@@ -405,12 +457,24 @@ impl Visitor for Compiler {
     }
 
     fn visit_contract_decl(&mut self, c: &Contract) {
+        let mut contract_compiler = Compiler::new(&c.name);
+
+        contract_compiler.begin_scope();
+        // Initializers are forbidden
         for var in &c.vars {
-            self.visit_var_decl(var);
+            self.add_local(&var.name).expect("add_local");
+            self.mark_initialized();
         }
         for func in &c.funcs {
-            self.visit_fn_decl(func);
+            contract_compiler.visit_fn_decl(func);
         }
+        contract_compiler.end_scope();
+
+        let compiled_contract = contract_compiler
+            .end_contract(&c.name, c.vars.iter().map(|v| v.name.to_string()).collect());
+
+        self.contracts
+            .insert(compiled_contract.name.clone(), compiled_contract);
     }
 
     fn visit_fn_decl(&mut self, f: &Function) {
@@ -426,9 +490,10 @@ impl Visitor for Compiler {
             .compile(std::slice::from_ref(&*f.body))
             .expect("compile");
 
-        let mut func_obj = compiler.end().expect("compile");
+        let mut func_obj = compiler.end_function();
         func_obj.arity = f.params.len();
 
+        self.functions.insert(f.name.to_string(), func_obj.clone());
         let index = self.define_constant(Value::Function(func_obj));
 
         if self.scope_depth == 0 {

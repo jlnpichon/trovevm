@@ -37,6 +37,40 @@ impl VM {
         }
     }
 
+    #[cfg(feature = "tokio-async")]
+    pub async fn deploy(
+        &mut self,
+        sender: Address,
+        contract_address: Address,
+        args: Vec<Value>,
+    ) -> Result<ContractInstance, RuntimeError> {
+        let contract = self
+            .world_state
+            .registry
+            .get(&contract_address)
+            .ok_or(RuntimeError::ContractNotFound)?;
+
+        let instance_address = self.world_state.generate_address(sender);
+        let instance = ContractInstance::new(
+            instance_address,
+            contract.clone(),
+            self.world_state.storage.clone(),
+        );
+
+        self.world_state
+            .storage
+            .lock()
+            .await
+            .init_instance(instance_address);
+
+        if let Some(method) = instance.get_method("init") {
+            self.call_method(method, Value::ContractInstance(instance.clone()), args)?;
+        }
+
+        Ok(instance)
+    }
+
+    #[cfg(not(feature = "tokio-async"))]
     pub fn deploy(
         &mut self,
         sender: Address,
@@ -50,15 +84,15 @@ impl VM {
             .ok_or(RuntimeError::ContractNotFound)?;
 
         let instance_address = self.world_state.generate_address(sender);
-        let mut instance = ContractInstance::new(
+        let instance = ContractInstance::new(
             instance_address,
             contract.clone(),
             self.world_state.storage.clone(),
         );
+
         self.world_state
             .storage
-            .0
-            .borrow_mut()
+            .lock()
             .init_instance(instance_address);
 
         if let Some(method) = instance.get_method("init") {
@@ -318,6 +352,12 @@ impl VM {
                 Opcode::SetLocal(index) => {
                     let value = self.stack_top().ok_or(RuntimeError::StackUnderflow)?;
                     self.stack_set(index, value.clone())?;
+                }
+                Opcode::GetField(index) => {
+                    todo!()
+                }
+                Opcode::SetField(index) => {
+                    todo!()
                 }
 
                 Opcode::Jump(offset) => {
