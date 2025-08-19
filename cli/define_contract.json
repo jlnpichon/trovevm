@@ -1,0 +1,12 @@
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "method": "trove_defineContract",
+  "params": [
+    {
+      "source_code": "contract Foo {}",
+      "contract_name": "Foo",
+      "sender": "0x1234abcd"
+    }
+  ]
+}

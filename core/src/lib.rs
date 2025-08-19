@@ -8,7 +8,7 @@ pub mod value;
 pub mod world_state;
 
 pub use address::Address;
-pub use bytecode::{Opcode, Program};
+pub use bytecode::{CompiledProgram, Opcode, Program};
 pub use contract::{Contract, ContractInstance};
 pub use error::RuntimeError;
 pub use function::CompiledFunction;

@@ -2,10 +2,13 @@ use std::fmt;
 
 //use crate::core::ast::Literal;
 
+use serde::{Deserialize, Serialize};
+
 use super::{contract::ContractInstance, function::CompiledFunction};
 use crate::error::RuntimeError;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "value")]
 pub enum Value {
     Number(f64),
     String(String),

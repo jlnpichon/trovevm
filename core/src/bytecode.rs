@@ -1,8 +1,10 @@
-use std::ops::Index;
+use std::{collections::HashMap, ops::Index};
 
-use crate::value::Value;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+use crate::{CompiledFunction, contract::CompiledContract, value::Value};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Opcode {
     Add,
     Sub,
@@ -37,7 +39,13 @@ pub enum Opcode {
     Return,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
+pub struct CompiledProgram {
+    pub contracts: HashMap<String, CompiledContract>,
+    pub script: CompiledFunction,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Program {
     bytecode: Vec<Opcode>,
     constants: Vec<Value>,

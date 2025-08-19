@@ -1,5 +1,5 @@
-use trove_core::CompiledFunction;
-use trovec::{CompileError, ParseErrorWithContext, codegen::compiler::CompiledProgram};
+use trove_core::CompiledProgram;
+use trovec::{CompileError, ParseErrorWithContext};
 
 use crate::{InputSource, input::InputError};
 

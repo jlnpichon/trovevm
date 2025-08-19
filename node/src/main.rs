@@ -1,7 +1,14 @@
-use std::net::SocketAddr;
+use std::{
+    net::SocketAddr,
+    sync::{Arc, Mutex},
+};
 
 use jsonrpsee::{
-    core::RpcResult, proc_macros::rpc, server::ServerBuilder, tracing::info, types::ErrorObject,
+    core::RpcResult,
+    proc_macros::rpc,
+    server::ServerBuilder,
+    tracing::{debug, info},
+    types::ErrorObject,
 };
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
@@ -19,15 +26,17 @@ pub struct DeployContractResponse {
     pub instance_address: String,
 }
 
-#[derive(serde::Deserialize, Clone)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct DefineContractRequest {
     pub source_code: String,
+    pub contract_name: String,
     pub sender: String,
 }
 
 #[derive(serde::Serialize, Clone)]
 pub struct DefineContractResponse {
     pub bytecode_hash: String,
+    pub contract_address: String,
 }
 
 #[rpc(server)]
@@ -59,7 +68,7 @@ pub trait TroveRpc {
 
 #[derive(Clone, Debug)]
 pub struct TroveRcpServerImpl {
-    world_state: WorldState,
+    world_state: Arc<Mutex<WorldState>>,
 }
 
 impl TroveRpcServer for TroveRcpServerImpl {
@@ -111,6 +120,20 @@ impl TroveRpcServer for TroveRcpServerImpl {
     }
 
     fn define_contract(&self, request: DefineContractRequest) -> RpcResult<DefineContractResponse> {
+        if self
+            .world_state
+            .lock()
+            .unwrap()
+            .name_index
+            .contains_key(&request.contract_name)
+        {
+            return Err(ErrorObject::owned(
+                1000,
+                format!("Contract '{}' already defined", request.contract_name),
+                None::<()>,
+            ));
+        }
+
         let program = match parse_program("".to_string(), &request.source_code) {
             Ok(program) => program,
             Err(err) => {
@@ -118,23 +141,67 @@ impl TroveRpcServer for TroveRcpServerImpl {
             }
         };
 
-        let bytecode = match compile(&program.statements) {
-            Ok(bytecode) => bytecode,
+        let compiled_program = match compile(&program.statements) {
+            Ok(compiled_program) => compiled_program,
             Err(err) => {
                 return Err(ErrorObject::owned(1000, format!("{err}"), None::<()>));
             }
         };
 
-        let address = request
-            .sender
-            .parse::<u64>()
-            .map_err(|err| ErrorObject::owned(1000, format!("{err}"), None::<()>))?;
+        let sender_address = u64::from_str_radix(request.sender.trim_start_matches("0x"), 16)
+            .map_err(|err| {
+                ErrorObject::owned(1000, format!("Parsing sender address: '{err}'"), None::<()>)
+            })?;
 
-        let contract = todo!();
-        self.world_state.registry.insert(address, contract);
+        let contract = compiled_program
+            .contracts
+            .get(&request.contract_name)
+            .ok_or(ErrorObject::owned(
+                1000,
+                format!("No contract '{}' defined in source", request.contract_name),
+                None::<()>,
+            ))?
+            .clone();
+
+        let bytecode_hash = contract.code_hash;
+        let bytecode_str = hex::encode(contract.code_hash);
+
+        if self
+            .world_state
+            .lock()
+            .unwrap()
+            .code_hash_index
+            .contains_key(&contract.code_hash)
+        {
+            return Err(ErrorObject::owned(
+                1000,
+                format!("Contract with hash '{}' already defined", bytecode_str),
+                None::<()>,
+            ));
+        }
+
+        let contract_address = self.world_state.lock().unwrap().define_contract(contract);
+        self.world_state
+            .lock()
+            .unwrap()
+            .name_index
+            .insert(request.contract_name, contract_address);
+        self.world_state
+            .lock()
+            .unwrap()
+            .code_hash_index
+            .insert(bytecode_hash, contract_address);
+        self.world_state
+            .lock()
+            .unwrap()
+            .sender_index
+            .entry(sender_address)
+            .or_default()
+            .push(contract_address);
 
         Ok(DefineContractResponse {
-            bytecode_hash: todo!(),
+            bytecode_hash: bytecode_str,
+            contract_address: format!("{contract_address}"),
         })
     }
 
@@ -180,7 +247,7 @@ async fn main() -> anyhow::Result<()> {
     let local_addr = server.local_addr();
 
     let server_impl = TroveRcpServerImpl {
-        world_state: WorldState::default(),
+        world_state: Arc::new(Mutex::new(WorldState::default())),
     };
     let handle = server.start(server_impl.into_rpc());
     info!("Server running on {local_addr:?}");

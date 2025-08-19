@@ -1,24 +1,31 @@
+use serde::{Deserialize, Serialize};
+
 use crate::value::Value;
 
 use crate::RuntimeError;
 use crate::bytecode::{Opcode, Program};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompiledFunction {
     pub kind: CompiledFunctionKind,
     pub name: String,
     pub arity: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CompiledFunctionKind {
     Bytecode(Program),
+    /*
+    #[serde(skip)]
     Native(Box<dyn Callable>),
+    */
+    Native(String),
 }
 
 pub trait Callable: std::fmt::Debug + Send + Sync {
     fn call(&self, args: &[Value], context: &mut dyn ExecContext) -> Result<Value, RuntimeError>;
     fn clone_box(&self) -> Box<dyn Callable>;
+    fn name(&self) -> &'static str;
 }
 
 impl Clone for Box<dyn Callable> {

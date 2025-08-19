@@ -4,7 +4,7 @@ use tracing::trace;
 
 use trove_core::{
     Address, CompiledFunction, ContractInstance, Opcode, Program, RuntimeError, Value, WorldState,
-    function::{CompiledFunctionKind, ExecContext},
+    function::{Callable, CompiledFunctionKind, ExecContext},
     value::Op,
 };
 
@@ -14,6 +14,7 @@ use crate::{function::CallFrame, native::install_natives};
 pub struct VM {
     stack: Vec<Value>, // TODO: limit
     globals: HashMap<String, Value>,
+    natives: HashMap<String, Box<dyn Callable>>,
     frames: Vec<CallFrame>, // TODO: limit
     world_state: WorldState,
 }
@@ -27,11 +28,13 @@ impl Default for VM {
 impl VM {
     pub fn new(world_state: WorldState) -> Self {
         let mut globals = HashMap::new();
-        install_natives(&mut globals);
+        let mut natives = HashMap::new();
+        install_natives(&mut globals, &mut natives);
 
         Self {
             stack: Vec::with_capacity(1024),
             globals,
+            natives,
             frames: vec![],
             world_state,
         }
@@ -48,9 +51,10 @@ impl VM {
             .world_state
             .registry
             .get(&contract_address)
-            .ok_or(RuntimeError::ContractNotFound)?;
+            .ok_or(RuntimeError::ContractNotFound)?
+            .clone();
 
-        let instance_address = self.world_state.generate_address(sender);
+        let instance_address = self.world_state.generate_address();
         let instance = ContractInstance::new(
             instance_address,
             contract.clone(),
@@ -232,7 +236,12 @@ impl VM {
                     base: self.stack.len() - args - 1,
                 });
             }
-            CompiledFunctionKind::Native(native) => {
+            CompiledFunctionKind::Native(name) => {
+                let native = self
+                    .natives
+                    .get(&name)
+                    .ok_or(RuntimeError::UndefinedNative(name.to_string()))?
+                    .clone();
                 let value = native.call(&[], self)?;
                 for _ in 0..args {
                     self.pop()?;

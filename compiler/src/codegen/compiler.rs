@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use crate::ast::{
     BinaryOp, Contract, Expr, Function, Identifier, Literal, Statement, UnaryOp, Var, Visitor,
 };
-use trove_core::{CompiledFunction, Opcode, Value};
+use trove_core::{
+    CompiledFunction, Opcode, Value, bytecode::CompiledProgram, contract::CompiledContract,
+};
 
 const MAX_LOCAL_VARS: usize = 255;
 
@@ -33,19 +35,6 @@ pub struct Compiler {
     contracts: HashMap<String, CompiledContract>,
     locals: Vec<Local>,
     scope_depth: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct CompiledContract {
-    name: String,
-    functions: HashMap<String, CompiledFunction>,
-    vars: Vec<String>,
-}
-
-#[derive(Debug, Clone)]
-pub struct CompiledProgram {
-    pub contracts: HashMap<String, CompiledContract>,
-    pub script: CompiledFunction,
 }
 
 impl Compiler {
@@ -84,11 +73,16 @@ impl Compiler {
 
     pub fn end_contract(mut self, name: &str, vars: Vec<String>) -> CompiledContract {
         self.emit_return();
-        CompiledContract {
+        let mut compiled_contract = CompiledContract {
             name: name.to_string(),
-            functions: std::mem::take(&mut self.functions),
+            methods: std::mem::take(&mut self.functions),
             vars,
-        }
+            code_hash: [0; 32],
+        };
+        compiled_contract
+            .compute_hash()
+            .expect("compute_hash failed");
+        compiled_contract
     }
 
     pub fn function_map(&self) -> HashMap<String, CompiledFunction> {

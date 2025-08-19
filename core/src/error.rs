@@ -18,6 +18,8 @@ pub enum RuntimeError {
     InvalidStringOperation(Op),
     #[error("undefined variable '{0:?}'")]
     UndefinedVariable(String),
+    #[error("undefined native '{0:?}'")]
+    UndefinedNative(String),
     #[error("No call frame in VM")]
     NoCallFrame,
     #[error("ip is out of bounds")]

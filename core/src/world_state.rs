@@ -1,28 +1,29 @@
 use std::collections::HashMap;
 
-use crate::storage::SharedStorage;
+use crate::{contract::CompiledContract, storage::SharedStorage};
 
-use super::{address::Address, contract::Contract};
+use super::address::Address;
 
 #[derive(Debug, Clone, Default)]
 pub struct WorldState {
-    pub registry: HashMap<Address, Contract>,
+    pub name_index: HashMap<String, Address>,
+    pub code_hash_index: HashMap<[u8; 32], Address>,
+    pub sender_index: HashMap<Address, Vec<Address>>, // list a defined contract
+    pub registry: HashMap<Address, CompiledContract>,
     pub storage: SharedStorage,
+    next_address: u64,
 }
 
 impl WorldState {
-    pub fn generate_address(&self, sender: Address) -> Address {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
-        let mut hasher = DefaultHasher::new();
-        sender.hash(&mut hasher);
-        self.registry.len().hash(&mut hasher);
-        hasher.finish()
+    pub fn generate_address(&mut self) -> Address {
+        let addr = self.next_address;
+        self.next_address += 1;
+        addr
     }
 
-    pub fn define_contract(&mut self, sender: Address, contract: Contract) {
-        let address = self.generate_address(sender);
+    pub fn define_contract(&mut self, contract: CompiledContract) -> Address {
+        let address = self.generate_address();
         self.registry.insert(address, contract);
+        address
     }
 }

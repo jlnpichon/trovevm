@@ -10,6 +10,8 @@ pub type NativeFn = fn(&[Value], &mut dyn ExecContext) -> Result<Value, RuntimeE
 #[derive(Debug, Clone)]
 pub struct Native {
     pub func: NativeFn,
+    pub name: &'static str,
+    pub arity: usize,
 }
 
 impl Callable for Native {
@@ -24,21 +26,36 @@ impl Callable for Native {
     fn clone_box(&self) -> Box<dyn Callable> {
         Box::new(self.clone())
     }
+
+    fn name(&self) -> &'static str {
+        self.name
+    }
 }
 
-pub fn install_natives(globals: &mut HashMap<String, Value>) {
-    define_native(globals, "clock", 0, clock);
+pub fn install_natives(
+    globals: &mut HashMap<String, Value>,
+    natives: &mut HashMap<String, Box<dyn Callable>>,
+) {
+    define_native(globals, natives, "clock", 0, clock);
 }
 
-fn define_native(globals: &mut HashMap<String, Value>, name: &str, arity: usize, func: NativeFn) {
-    let native = Native { func };
-    let value = Value::Function(CompiledFunction {
-        kind: CompiledFunctionKind::Native(Box::new(native)),
-        name: name.to_string(),
-        arity,
-    });
-
-    globals.insert(name.into(), value);
+fn define_native(
+    globals: &mut HashMap<String, Value>,
+    natives: &mut HashMap<String, Box<dyn Callable>>,
+    name: &'static str,
+    arity: usize,
+    func: NativeFn,
+) {
+    let native = Native { func, name, arity };
+    natives.insert(name.into(), Box::new(native));
+    globals.insert(
+        name.into(),
+        Value::Function(CompiledFunction {
+            kind: CompiledFunctionKind::Native(name.to_string()),
+            name: name.to_string(),
+            arity,
+        }),
+    );
 }
 
 fn clock(_: &[Value], _: &mut dyn ExecContext) -> Result<Value, RuntimeError> {
