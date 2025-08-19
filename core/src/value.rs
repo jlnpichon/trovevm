@@ -118,6 +118,13 @@ impl Value {
         }
     }
 
+    pub fn as_instance(&self) -> Option<&ContractInstance> {
+        match self {
+            Value::ContractInstance(instance) => Some(instance),
+            _ => None,
+        }
+    }
+
     pub fn as_number(&self) -> Option<f64> {
         match self {
             Value::Number(n) => Some(*n),
@@ -154,7 +161,23 @@ impl PartialEq for Value {
 
 impl From<&str> for Value {
     fn from(value: &str) -> Self {
-        Value::String(value.to_string())
+        if let Ok(n) = value.parse::<f64>() {
+            Value::Number(n)
+        } else if value.to_lowercase() == "true" {
+            Value::Bool(true)
+        } else if value.to_lowercase() == "false" {
+            Value::Bool(false)
+        } else if value.to_lowercase() == "null" {
+            Value::Null
+        } else {
+            Value::String(value.to_string())
+        }
+    }
+}
+
+impl From<String> for Value {
+    fn from(value: String) -> Self {
+        Value::from(value.as_str())
     }
 }
 

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{contract::CompiledContract, storage::SharedStorage};
+use crate::{Value, contract::CompiledContract, storage::SharedStorage};
 
 use super::address::Address;
 

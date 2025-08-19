@@ -28,6 +28,14 @@ pub struct Local {
     pub depth: Option<usize>,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum ScopeType {
+    #[default]
+    Script, // Top-level
+    Function,
+    Method,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Compiler {
     function: CompiledFunction,
@@ -35,6 +43,7 @@ pub struct Compiler {
     contracts: HashMap<String, CompiledContract>,
     locals: Vec<Local>,
     scope_depth: usize,
+    scope_type: ScopeType,
 }
 
 impl Compiler {
@@ -204,7 +213,10 @@ impl Visitor for Compiler {
                 self.visit_contract_decl(contract);
             }
             Statement::FnDecl(function) => {
+                let previous_scope_type = self.scope_type;
+                self.scope_type = ScopeType::Function;
                 self.visit_fn_decl(function);
+                self.scope_type = previous_scope_type;
             }
             Statement::VarDecl(var) => {
                 self.visit_var_decl(var);
@@ -327,7 +339,10 @@ impl Visitor for Compiler {
         match e {
             Expr::Literal(literal) => self.visit_literal(literal),
             Expr::Variable(var) => {
-                if let Some(index) = self.resolve_local(var).expect("resolve_local") {
+                if let Some(mut index) = self.resolve_local(var).expect("resolve_local") {
+                    if self.scope_type == ScopeType::Method {
+                        index += 1;
+                    }
                     self.emit_opcode(Opcode::GetLocal(index));
                 } else {
                     let index = self.define_constant(Value::String(var.clone()));
@@ -344,8 +359,8 @@ impl Visitor for Compiler {
                 name,
                 value,
             } => {
-                value.accept(self);
                 object.accept(self);
+                value.accept(self);
 
                 let index = self.define_constant(Value::String(name.clone()));
                 self.emit_opcode(Opcode::SetField(index));
@@ -428,8 +443,15 @@ impl Visitor for Compiler {
     }
 
     fn visit_literal(&mut self, l: &Literal) {
-        let value = Value::from(l);
-        self.emit_constant(value);
+        if matches!(l, Literal::This) {
+            if self.scope_type != ScopeType::Method {
+                panic!("'this' used outside of a method");
+            }
+            self.emit_opcode(Opcode::GetLocal(0));
+        } else {
+            let value = Value::from(l);
+            self.emit_constant(value);
+        }
     }
 
     fn visit_var_decl(&mut self, v: &Var) {
@@ -453,15 +475,19 @@ impl Visitor for Compiler {
     fn visit_contract_decl(&mut self, c: &Contract) {
         let mut contract_compiler = Compiler::new(&c.name);
 
+        contract_compiler.scope_type = self.scope_type;
         contract_compiler.begin_scope();
         // Initializers are forbidden
         for var in &c.vars {
             self.add_local(&var.name).expect("add_local");
             self.mark_initialized();
         }
+
+        contract_compiler.scope_type = ScopeType::Method;
         for func in &c.funcs {
             contract_compiler.visit_fn_decl(func);
         }
+        contract_compiler.scope_type = self.scope_type;
         contract_compiler.end_scope();
 
         let compiled_contract = contract_compiler
@@ -474,6 +500,7 @@ impl Visitor for Compiler {
     fn visit_fn_decl(&mut self, f: &Function) {
         let mut compiler = Compiler::new(&f.name);
 
+        compiler.scope_type = self.scope_type;
         compiler.begin_scope();
         for param in &f.params {
             compiler.add_local(param).expect("add_local");
@@ -510,6 +537,7 @@ impl From<&Literal> for Value {
             Literal::String(s) => Value::String(s.to_string()),
             Literal::Bool(b) => Value::Bool(*b),
             Literal::Null => Value::Null,
+            Literal::This => panic!("Literal::This must never be converted to a Value"),
         }
     }
 }

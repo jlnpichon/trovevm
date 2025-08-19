@@ -45,6 +45,7 @@ pub enum Literal {
     String(String),
     Bool(bool),
     Null,
+    This,
 }
 
 #[derive(Debug, Clone)]

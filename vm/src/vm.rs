@@ -4,6 +4,7 @@ use tracing::trace;
 
 use trove_core::{
     Address, CompiledFunction, ContractInstance, Opcode, Program, RuntimeError, Value, WorldState,
+    contract::CompiledContract,
     function::{Callable, CompiledFunctionKind, ExecContext},
     value::Op,
 };
@@ -16,17 +17,16 @@ pub struct VM {
     globals: HashMap<String, Value>,
     natives: HashMap<String, Box<dyn Callable>>,
     frames: Vec<CallFrame>, // TODO: limit
-    world_state: WorldState,
 }
 
 impl Default for VM {
     fn default() -> Self {
-        Self::new(WorldState::default())
+        Self::new()
     }
 }
 
 impl VM {
-    pub fn new(world_state: WorldState) -> Self {
+    pub fn new() -> Self {
         let mut globals = HashMap::new();
         let mut natives = HashMap::new();
         install_natives(&mut globals, &mut natives);
@@ -36,89 +36,85 @@ impl VM {
             globals,
             natives,
             frames: vec![],
-            world_state,
         }
     }
 
-    #[cfg(feature = "tokio-async")]
-    pub async fn deploy(
-        &mut self,
-        sender: Address,
-        contract_address: Address,
-        args: Vec<Value>,
-    ) -> Result<ContractInstance, RuntimeError> {
-        let contract = self
-            .world_state
-            .registry
-            .get(&contract_address)
-            .ok_or(RuntimeError::ContractNotFound)?
-            .clone();
-
-        let instance_address = self.world_state.generate_address();
-        let instance = ContractInstance::new(
-            instance_address,
-            contract.clone(),
-            self.world_state.storage.clone(),
-        );
-
-        self.world_state
-            .storage
-            .lock()
-            .await
-            .init_instance(instance_address);
-
-        if let Some(method) = instance.get_method("init") {
-            self.call_method(method, Value::ContractInstance(instance.clone()), args)?;
-        }
-
-        Ok(instance)
-    }
-
-    #[cfg(not(feature = "tokio-async"))]
     pub fn deploy(
         &mut self,
-        sender: Address,
-        contract_address: Address,
+        contract: CompiledContract,
         args: Vec<Value>,
+        world_state: &mut WorldState,
     ) -> Result<ContractInstance, RuntimeError> {
-        let contract = self
-            .world_state
-            .registry
-            .get(&contract_address)
-            .ok_or(RuntimeError::ContractNotFound)?;
+        let address = world_state.generate_address();
+        world_state.storage.lock().init_instance(address, &contract);
 
-        let instance_address = self.world_state.generate_address(sender);
-        let instance = ContractInstance::new(
-            instance_address,
-            contract.clone(),
-            self.world_state.storage.clone(),
-        );
+        let instance =
+            ContractInstance::new(address, contract.clone(), world_state.storage.clone());
 
-        self.world_state
-            .storage
-            .lock()
-            .init_instance(instance_address);
-
-        if let Some(method) = instance.get_method("init") {
-            self.call_method(method, Value::ContractInstance(instance.clone()), args)?;
+        if let Some(init_method) = instance.get_method("init") {
+            self.call_method(init_method, Value::ContractInstance(instance.clone()), args)?;
         }
+
+        world_state.registry.insert(address, contract);
 
         Ok(instance)
     }
 
-    fn call_method(
+    pub fn sandbox_call(
+        &mut self,
+        contract: CompiledContract,
+        method_name: &str,
+        args: Vec<Value>,
+        init_args: Option<Vec<Value>>,
+    ) -> Result<Value, RuntimeError> {
+        let storage = contract.default_storage();
+        let instance = ContractInstance::new(0, contract, storage);
+
+        let method = instance
+            .get_method(method_name)
+            .ok_or(RuntimeError::UndefinedVariable(method_name.to_string()))?;
+
+        if let Some(init_method) = instance.get_method("init") {
+            let args = init_args.unwrap_or_default();
+            self.call_method(init_method, Value::ContractInstance(instance.clone()), args)?;
+        }
+
+        self.call_method(method, Value::ContractInstance(instance), args)
+    }
+
+    pub fn call_contract_method(
+        &mut self,
+        instance: ContractInstance,
+        method_name: &str,
+        args: Vec<Value>,
+    ) -> Result<Value, RuntimeError> {
+        let method = instance
+            .get_method(method_name)
+            .ok_or(RuntimeError::UndefinedVariable(method_name.to_string()))?;
+        self.call_method(method, Value::ContractInstance(instance), args)
+    }
+
+    pub fn call_method(
         &mut self,
         method: CompiledFunction,
         this: Value,
         args: Vec<Value>,
     ) -> Result<Value, RuntimeError> {
+        let function_obj = Value::Function(method.clone());
+        self.push(function_obj);
+
+        let args_len = args.len();
         self.push(this);
         for arg in args {
             self.push(arg);
         }
 
-        self.call(method.clone(), method.arity)?;
-        self.run_loop()
+        self.call(method, args_len + 1 /* this */)?;
+        let result = self.run_loop()?;
+
+        self.frames.pop();
+
+        Ok(result)
     }
 
     fn run_transaction(
@@ -363,10 +359,55 @@ impl VM {
                     self.stack_set(index, value.clone())?;
                 }
                 Opcode::GetField(index) => {
-                    todo!()
+                    let field_name =
+                        self.constant_get(index)?
+                            .as_string()
+                            .ok_or(RuntimeError::TypeError(
+                                "GetField: constant must be a string".into(),
+                            ))?;
+                    let mut this = self
+                        .stack_top()
+                        .ok_or(RuntimeError::StackUnderflow)?
+                        .as_instance()
+                        .ok_or(RuntimeError::TypeError(
+                            "'this' must be a contract instance".into(),
+                        ))?
+                        .clone();
+
+                    if !this.var_exists(field_name) {
+                        return Err(RuntimeError::UndefinedVariable(field_name.clone()));
+                    }
+
+                    let value = this
+                        .get_field(field_name)
+                        .ok_or(RuntimeError::UndefinedVariable(field_name.clone()))?;
+
+                    self.push(value);
                 }
                 Opcode::SetField(index) => {
-                    todo!()
+                    let field_name = self
+                        .constant_get(index)?
+                        .as_string()
+                        .ok_or(RuntimeError::TypeError(
+                            "GetField: constant must be a string".into(),
+                        ))?
+                        .clone();
+                    let value = self.pop()?;
+                    let mut this = self
+                        .stack_top()
+                        .ok_or(RuntimeError::StackUnderflow)?
+                        .as_instance()
+                        .ok_or(RuntimeError::TypeError(
+                            "'this' must be a contract instance".into(),
+                        ))?
+                        .clone();
+
+                    if !this.var_exists(&field_name) {
+                        return Err(RuntimeError::UndefinedVariable(field_name.clone()));
+                    }
+
+                    this.set_field(&field_name, value.clone());
+                    self.push(value);
                 }
 
                 Opcode::Jump(offset) => {

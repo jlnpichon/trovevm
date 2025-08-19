@@ -95,6 +95,7 @@ fn literal(pairs: &mut pest::iterators::Pairs<Rule>) -> Result<Expr, PestError> 
                 .to_owned(),
         )),
         Rule::NULL_KW => Expr::Literal(Literal::Null),
+        Rule::THIS_KW => Expr::Literal(Literal::This),
         Rule::INT => Expr::Literal(Literal::Number(pair.as_str().parse::<f64>().map_err(
             |e| {
                 pest::error::Error::new_from_span(

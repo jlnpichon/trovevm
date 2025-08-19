@@ -69,7 +69,7 @@ bin_op = _{
 }
 
 // ---- Literals ----
-Literal =  { INT | BOOL | NULL_KW | String | HEXADDR }
+Literal =  { INT | BOOL | NULL_KW | String | HEXADDR | THIS_KW }
 INT     = @{ MINUS? ~ DIGIT+ }
 BOOL    = @{ "true" | "false" }
 HEXADDR = @{ "0x" ~ HEX_DIGIT+ }
@@ -89,6 +89,7 @@ KEYWORD     = @{
   | RETURN_KW
   | WHILE_KW
   | NULL_KW
+  | THIS_KW
 }
 CONTRACT_KW = @{ "contract" }
 ELSE_KW     = @{ "else" }
@@ -99,6 +100,7 @@ LET_KW      = @{ "let" }
 RETURN_KW   = @{ "return" }
 WHILE_KW    = @{ "while" }
 NULL_KW     = @{ "null" }
+THIS_KW     = @{ "this" }
 
 // ---- Symbols ----
 DOT       = @{ "." }

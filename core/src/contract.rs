@@ -37,28 +37,20 @@ impl ContractInstance {
         }
     }
 
-    #[cfg(feature = "tokio-async")]
-    pub async fn get_field(&mut self, key: &str) -> Option<Value> {
-        self.storage.lock().await.get(self.address, key)
-    }
-
-    #[cfg(not(feature = "tokio-async"))]
     pub fn get_field(&mut self, key: &str) -> Option<Value> {
         self.storage.lock().get(self.address, key)
     }
 
-    #[cfg(feature = "tokio-async")]
-    pub async fn set_field(&mut self, key: &str, value: Value) {
-        self.storage.lock().await.set(self.address, key, value)
-    }
-
-    #[cfg(not(feature = "tokio-async"))]
     pub fn set_field(&mut self, key: &str, value: Value) {
         self.storage.lock().set(self.address, key, value)
     }
 
     pub fn get_method(&self, name: &str) -> Option<CompiledFunction> {
         self.contract.methods.get(name).cloned()
+    }
+
+    pub fn var_exists(&self, name: &String) -> bool {
+        self.contract.var_exists(name)
     }
 }
 
@@ -78,6 +70,17 @@ impl CompiledContract {
         let hash: [u8; 32] = Sha256::digest(&serialized_bytes).into();
         self.code_hash = hash;
         Ok(())
+    }
+
+    pub fn var_exists(&self, name: &String) -> bool {
+        self.vars.contains(name)
+    }
+
+    pub fn default_storage(&self) -> SharedStorage {
+        let storage = SharedStorage::default();
+        let instance_address = 0;
+        storage.lock().init_instance(instance_address, self);
+        storage
     }
 }
 

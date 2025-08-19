@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 use std::{collections::HashMap, sync::Arc};
 
+use crate::contract::CompiledContract;
 use crate::{address::Address, value::Value};
 
 #[cfg(feature = "tokio-async")]
@@ -30,8 +31,8 @@ impl SharedStorage {
     }
 
     #[cfg(feature = "tokio-async")]
-    pub async fn lock(&self) -> tokio::sync::MutexGuard<'_, Box<dyn StorageBackend + Send + Sync>> {
-        self.inner.lock().await
+    pub fn lock(&self) -> tokio::sync::MutexGuard<'_, Box<dyn StorageBackend + Send + Sync>> {
+        self.inner.blocking_lock()
     }
 
     #[cfg(not(feature = "tokio-async"))]
@@ -43,7 +44,7 @@ impl SharedStorage {
 pub trait StorageBackend: Debug + Send + Sync {
     fn get(&self, address: Address, key: &str) -> Option<Value>;
     fn set(&mut self, address: Address, key: &str, value: Value);
-    fn init_instance(&mut self, address: Address);
+    fn init_instance(&mut self, address: Address, contract: &CompiledContract);
 }
 
 #[derive(Debug, Clone, Default)]
@@ -69,7 +70,13 @@ impl StorageBackend for InMemoryStorage {
             .insert(key.to_string(), value);
     }
 
-    fn init_instance(&mut self, address: Address) {
-        self.memory.entry(address).or_default();
+    fn init_instance(&mut self, address: Address, contract: &CompiledContract) {
+        let mut instance_map = HashMap::new();
+
+        for var in &contract.vars {
+            instance_map.insert(var.clone(), Value::Null);
+        }
+
+        self.memory.insert(address, instance_map);
     }
 }

@@ -4,15 +4,15 @@ use std::{
 };
 
 use jsonrpsee::{
-    core::RpcResult,
-    proc_macros::rpc,
-    server::ServerBuilder,
-    tracing::{debug, info},
-    types::ErrorObject,
+    core::RpcResult, proc_macros::rpc, server::ServerBuilder, tracing::info, types::ErrorObject,
 };
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
-use trove_core::WorldState;
+use trove_core::{
+    Address, CompiledFunction, ContractInstance, RuntimeError, Value, WorldState,
+    contract::CompiledContract, storage::SharedStorage,
+};
+use trove_vm::VM;
 use trovec::{codegen::compile, parser::parse_program};
 
 #[derive(serde::Deserialize, Clone)]
@@ -39,6 +39,14 @@ pub struct DefineContractResponse {
     pub contract_address: String,
 }
 
+#[derive(serde::Deserialize, Clone)]
+pub struct CallContractRequest {
+    pub caller: String,
+    pub callee: String,
+    pub method: String,
+    pub args: Vec<String>,
+}
+
 #[rpc(server)]
 pub trait TroveRpc {
     #[method(name = "system_version")]
@@ -46,7 +54,7 @@ pub trait TroveRpc {
 
     // Read-only call of a contract no state modifications.
     #[method(name = "trove_call")]
-    fn call(&self, from: String, to: String, data: String) -> RpcResult<String>;
+    fn call(&self, request: CallContractRequest) -> RpcResult<String>;
 
     // Deploy a contract from an EOA. Returns the contract Address
     #[method(name = "trove_deployContract")]
@@ -71,6 +79,10 @@ pub struct TroveRcpServerImpl {
     world_state: Arc<Mutex<WorldState>>,
 }
 
+fn args_parse(args: Vec<String>) -> Vec<Value> {
+    args.iter().cloned().map(Value::from).collect()
+}
+
 impl TroveRpcServer for TroveRcpServerImpl {
     fn version(&self) -> RpcResult<String> {
         Ok("2".to_string())
@@ -91,27 +103,48 @@ impl TroveRpcServer for TroveRcpServerImpl {
         todo!()
     }
 
-    fn call(&self, from: String, to: String, data: String) -> RpcResult<String> {
-        // Read contract state
-        // Test code
-        //
+    fn call(&self, request: CallContractRequest) -> RpcResult<String> {
+        let caller = request.caller.parse::<u64>().map_err(|err| {
+            ErrorObject::owned(1000, format!("Caller address error: '{err}'"), None::<()>)
+        })?;
+        let callee = request.callee.parse::<u64>().map_err(|err| {
+            ErrorObject::owned(1000, format!("Callee address error: '{err}'"), None::<()>)
+        })?;
+        let args = args_parse(request.args);
+
+        let contract = self
+            .world_state
+            .lock()
+            .unwrap()
+            .registry
+            .get(&callee)
+            .ok_or(ErrorObject::owned(
+                1000,
+                format!("Contract '{}' not found", request.callee),
+                None::<()>,
+            ))?
+            .clone();
+
         /*
-        {
-            "method":"trove_call",
-            "params": {
-            "contract": "Counter",
-            "function": "get",
-            "args": []
-        },
-        {
-            "method":"trove_call",
-            "params": {
-            "address": "0x1234567890abcdef",
-            "function": "increment",
-            "args": []
-        }
+                let method = contract
+                    .methods
+                    .get(&request.method)
+                    .ok_or(ErrorObject::owned(
+                        1000,
+                        format!("Contract method '{}' not found", request.method),
+                        None::<()>,
+                    ))?
+                    .clone();
+
+                let storage_snapshot = self.world_state.lock().unwrap().storage.clone();
+                call_contract(contract, caller, method, args, storage_snapshot)
+                    .map_err(|err| ErrorObject::owned(1000, format!("{err:?}"), None::<()>))?;
         */
 
+        let mut vm = VM::new();
+        // TODO: insert caller and other variables into the VM env
+        vm.sandbox_call(contract, &request.method, args, None)
+            .map_err(|err| ErrorObject::owned(1000, format!("{err:?}"), None::<()>))?;
         // if params as contract
         // -> exec read-only contract
         // if params as address
@@ -256,3 +289,18 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+/*
+pub fn call_contract(
+    contract: CompiledContract,
+    caller: Address,
+    method: CompiledFunction,
+    args: Vec<Value>,
+    storage_snapshot: SharedStorage,
+) -> Result<Value, RuntimeError> {
+    // TODO: insert caller into a *special* variable in the VM
+    let mut vm = VM::new();
+    let fake_instance = ContractInstance::new(0, contract.clone(), storage_snapshot);
+    vm.call_method(method, Value::ContractInstance(fake_instance), args)
+}
+*/
