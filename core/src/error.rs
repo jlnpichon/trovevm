@@ -20,6 +20,8 @@ pub enum RuntimeError {
     UndefinedVariable(String),
     #[error("undefined native '{0:?}'")]
     UndefinedNative(String),
+    #[error("undefined builtin variable '{0}'")]
+    UndefinedBuiltinVariable(String),
     #[error("No call frame in VM")]
     NoCallFrame,
     #[error("ip is out of bounds")]
@@ -28,4 +30,6 @@ pub enum RuntimeError {
     WrongArgCount(usize, usize),
     #[error("no contract definition found for the given address")]
     ContractNotFound,
+    #[error("No contract instance associated with the VM")]
+    NoContractInstance,
 }

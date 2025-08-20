@@ -4,7 +4,7 @@
   "method": "trove_defineContract",
   "params": [
     {
-      "source_code": "contract Foo {}",
+      "source_code": "contract Foo { let count; fn init() { this.count = 0; } fn get() { return this.count; }}",
       "contract_name": "Foo",
       "sender": "0x1234abcd"
     }

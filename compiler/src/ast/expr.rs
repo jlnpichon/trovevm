@@ -1,9 +1,26 @@
-use super::{Literal, Visitor};
+use crate::CompileError;
+
+use super::{Literal, Visitor, visitor::VisitorMut};
+
+#[derive(Debug, Clone)]
+pub enum BuiltinVariableKind {
+    MsgSender,
+    MsgValue,
+    MsgData,
+    MsgBalance,
+    BlockNumber,
+    BlockTimestamp,
+    BlockHash,
+    BlockGasLimit,
+    BlockCoinbase,
+    Balance(Box<Expr>),
+}
 
 #[derive(Debug, Clone)]
 pub enum Expr {
     Literal(Literal),
     Variable(String),
+    BuiltinVariable(BuiltinVariableKind),
     Assign {
         target: Box<Expr>,
         value: Box<Expr>,
@@ -74,5 +91,9 @@ impl BinaryOp {
 impl Expr {
     pub fn accept<V: Visitor>(&self, visitor: &mut V) {
         visitor.visit_expr(self)
+    }
+
+    pub fn accept_mut<V: VisitorMut>(&mut self, visitor: &mut V) -> Result<(), CompileError> {
+        visitor.visit_expr_mut(self)
     }
 }

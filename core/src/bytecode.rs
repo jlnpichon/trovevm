@@ -31,6 +31,17 @@ pub enum Opcode {
     GetField(usize),
     SetField(usize),
 
+    GetSender,
+    GetValue,
+    GetData,
+    GetBalance,
+    GetBlockNumber,
+    GetBlockTimestamp,
+    GetBlockHash,
+    GetGasLimit,
+    GetCoinBase,
+    Balance,
+
     Jump(usize),
     JumpIfFalse(usize),
     JumpBack(usize),

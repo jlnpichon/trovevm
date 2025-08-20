@@ -1,0 +1,13 @@
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "method": "trove_call",
+  "params": [
+    {
+      "caller": "0x1234abcd",
+      "callee": "0x0",
+      "method": "get",
+      "args": []
+    }
+  ]
+}

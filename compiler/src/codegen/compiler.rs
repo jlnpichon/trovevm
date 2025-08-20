@@ -2,10 +2,13 @@ use std::collections::HashMap;
 
 use crate::ast::{
     BinaryOp, Contract, Expr, Function, Identifier, Literal, Statement, UnaryOp, Var, Visitor,
+    expr::BuiltinVariableKind,
 };
 use trove_core::{
     CompiledFunction, Opcode, Value, bytecode::CompiledProgram, contract::CompiledContract,
 };
+
+use super::desugar::desugar_ast;
 
 const MAX_LOCAL_VARS: usize = 255;
 
@@ -20,6 +23,10 @@ pub enum CompileError {
     VariableNotFound(String),
     #[error("Variable used in its own initializer")]
     VariableInOwnInitializer,
+    #[error("Invalid field access '{0}.{1}'")]
+    InvalidFieldAccess(String, String),
+    #[error("'{0}' is a reserved variable name")]
+    ReservedVariable(String),
 }
 
 #[derive(Debug, Clone)]
@@ -55,7 +62,8 @@ impl Compiler {
     }
 }
 
-pub fn compile(statements: &[Statement]) -> Result<CompiledProgram, CompileError> {
+pub fn compile(statements: &mut [Statement]) -> Result<CompiledProgram, CompileError> {
+    desugar_ast(statements)?;
     let mut compiler = Compiler::new("script");
     compiler.compile(statements)?;
     Ok(compiler.end_program())
@@ -348,6 +356,24 @@ impl Visitor for Compiler {
                     let index = self.define_constant(Value::String(var.clone()));
                     self.emit_opcode(Opcode::GetGlobal(index));
                 }
+            }
+            Expr::BuiltinVariable(kind) => {
+                let opcode = match kind {
+                    BuiltinVariableKind::MsgSender => Opcode::GetSender,
+                    BuiltinVariableKind::MsgValue => Opcode::GetValue,
+                    BuiltinVariableKind::MsgData => Opcode::GetData,
+                    BuiltinVariableKind::MsgBalance => Opcode::GetBalance,
+                    BuiltinVariableKind::BlockNumber => Opcode::GetBlockNumber,
+                    BuiltinVariableKind::BlockTimestamp => Opcode::GetBlockTimestamp,
+                    BuiltinVariableKind::BlockHash => Opcode::GetBlockHash,
+                    BuiltinVariableKind::BlockGasLimit => Opcode::GetGasLimit,
+                    BuiltinVariableKind::BlockCoinbase => Opcode::GetCoinBase,
+                    BuiltinVariableKind::Balance(expr) => {
+                        self.visit_expr(expr);
+                        Opcode::Balance
+                    }
+                };
+                self.emit_opcode(opcode);
             }
             Expr::Get { object, name } => {
                 self.visit_expr(object);

@@ -3,9 +3,9 @@ use trove_vm::VM;
 use trovec::{codegen::compile, parser::parse_program};
 
 fn compile_contract(source: &str, contract_name: &str) -> CompiledContract {
-    let ast = parse_program("<test>".to_string(), source)
+    let mut ast = parse_program("<test>".to_string(), source)
         .unwrap_or_else(|_| panic!("compiling '{contract_name}' contract failed"));
-    let compiled_program = compile(&ast.statements)
+    let compiled_program = compile(&mut ast.statements)
         .unwrap_or_else(|_| panic!("compiling '{contract_name}' contract failed"));
     compiled_program
         .contracts

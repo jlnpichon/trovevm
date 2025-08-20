@@ -125,22 +125,6 @@ impl TroveRpcServer for TroveRcpServerImpl {
             ))?
             .clone();
 
-        /*
-                let method = contract
-                    .methods
-                    .get(&request.method)
-                    .ok_or(ErrorObject::owned(
-                        1000,
-                        format!("Contract method '{}' not found", request.method),
-                        None::<()>,
-                    ))?
-                    .clone();
-
-                let storage_snapshot = self.world_state.lock().unwrap().storage.clone();
-                call_contract(contract, caller, method, args, storage_snapshot)
-                    .map_err(|err| ErrorObject::owned(1000, format!("{err:?}"), None::<()>))?;
-        */
-
         let mut vm = VM::new();
         // TODO: insert caller and other variables into the VM env
         vm.sandbox_call(contract, &request.method, args, None)
@@ -167,14 +151,14 @@ impl TroveRpcServer for TroveRcpServerImpl {
             ));
         }
 
-        let program = match parse_program("".to_string(), &request.source_code) {
+        let mut program = match parse_program("".to_string(), &request.source_code) {
             Ok(program) => program,
             Err(err) => {
                 return Err(ErrorObject::owned(1000, format!("{err}"), None::<()>));
             }
         };
 
-        let compiled_program = match compile(&program.statements) {
+        let compiled_program = match compile(&mut program.statements) {
             Ok(compiled_program) => compiled_program,
             Err(err) => {
                 return Err(ErrorObject::owned(1000, format!("{err}"), None::<()>));
@@ -289,18 +273,3 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
-
-/*
-pub fn call_contract(
-    contract: CompiledContract,
-    caller: Address,
-    method: CompiledFunction,
-    args: Vec<Value>,
-    storage_snapshot: SharedStorage,
-) -> Result<Value, RuntimeError> {
-    // TODO: insert caller into a *special* variable in the VM
-    let mut vm = VM::new();
-    let fake_instance = ContractInstance::new(0, contract.clone(), storage_snapshot);
-    vm.call_method(method, Value::ContractInstance(fake_instance), args)
-}
-*/

@@ -103,7 +103,7 @@ fn assert_program(
     pretty_assertions::assert_eq!(constants, expected_constants, "Constants mismatch");
 }
 
-fn run_compiler(statements: &[Statement], bytecode: &[Opcode], constants: &[Value]) {
+fn run_compiler(statements: &mut [Statement], bytecode: &[Opcode], constants: &[Value]) {
     let compiled_program = compile(statements).expect("compile ast");
     assert_program(&compiled_program.script, bytecode, constants);
 }
@@ -111,17 +111,17 @@ fn run_compiler(statements: &[Statement], bytecode: &[Opcode], constants: &[Valu
 #[test]
 fn test_compile_literal() {
     // 42.0;
-    let statement = make_stmt_expr(make_number_expr(42.0));
+    let mut statement = make_stmt_expr(make_number_expr(42.0));
     run_compiler(
-        &[statement],
+        &mut [statement],
         &[Opcode::Push(0), Opcode::Pop, Opcode::Return],
         &[Value::Number(42.0)],
     );
 
     // "a string";
-    let statement = make_stmt_expr(make_string_expr("a string"));
+    let mut statement = make_stmt_expr(make_string_expr("a string"));
     run_compiler(
-        &[statement],
+        &mut [statement],
         &[Opcode::Push(0), Opcode::Pop, Opcode::Return],
         &[Value::String(String::from("a string"))],
     );
@@ -129,13 +129,13 @@ fn test_compile_literal() {
     // "a string";
     // 42.42;
     // Null;
-    let statements = vec![
+    let mut statements = vec![
         make_stmt_expr(make_string_expr("a string")),
         make_stmt_expr(make_number_expr(42.42)),
         make_stmt_expr(make_null_expr()),
     ];
     run_compiler(
-        &statements,
+        &mut statements,
         &[
             Opcode::Push(0),
             Opcode::Pop,
@@ -158,13 +158,13 @@ fn test_compile_constant_reuse() {
     // "a string";
     // 42.0;
     // "a string";
-    let statements = vec![
+    let mut statements = vec![
         make_stmt_expr(make_string_expr("a string")),
         make_stmt_expr(make_number_expr(42.0)),
         make_stmt_expr(make_string_expr("a string")),
     ];
     run_compiler(
-        &statements,
+        &mut statements,
         &[
             Opcode::Push(0),
             Opcode::Pop,
@@ -188,7 +188,7 @@ fn test_compile_simple_addition() {
     ));
 
     run_compiler(
-        &[statement],
+        &mut [statement],
         &[
             Opcode::Push(0),
             Opcode::Push(1),
@@ -205,7 +205,7 @@ fn test_global_var() {
     let statement = make_var_decl("foo", Some(make_number_expr(42.0)));
 
     run_compiler(
-        &[statement],
+        &mut [statement],
         &[Opcode::Push(0), Opcode::DefineGlobal(1), Opcode::Return],
         &[Value::Number(42.0), Value::String("foo".into())],
     );
@@ -232,7 +232,7 @@ fn test_local_var() {
     ]);
 
     run_compiler(
-        &[statement],
+        &mut [statement],
         &[
             Opcode::Push(0),
             Opcode::Push(1),
@@ -257,7 +257,7 @@ fn test_if() {
     // 42;
     let then_branch = make_stmt_expr(make_number_expr(42.0));
     let else_branch = make_stmt_expr(make_string_expr("a string"));
-    let statements = &[
+    let statements = &mut [
         make_if(make_bool_expr(true), then_branch, Some(else_branch)),
         make_stmt_expr(make_number_expr(42.0)),
     ];
@@ -292,7 +292,7 @@ fn test_while() {
     //  42;
     // }
     //  "a string";
-    let statements = &[
+    let statements = &mut [
         make_while(make_bool_expr(true), make_stmt_expr(make_number_expr(42.0))),
         make_stmt_expr(make_string_expr("a string")),
     ];
@@ -325,7 +325,7 @@ fn test_for() {
     //  42;
     // }
     //  "a string";
-    let statements = &[
+    let statements = &mut [
         make_for(
             Some(make_var_decl("i", Some(make_number_expr(0.0)))),
             Some(make_binary_op(
@@ -344,7 +344,7 @@ fn test_for() {
 
     run_compiler(
         statements,
-        &[
+        &mut [
             // initializer
             Opcode::Push(0),
             //

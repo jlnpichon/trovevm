@@ -5,6 +5,9 @@ use std::ops::Deref;
 
 pub use expr::{BinaryOp, Expr, UnaryOp};
 pub use visitor::Visitor;
+use visitor::VisitorMut;
+
+use crate::CompileError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Identifier(pub String);
@@ -79,6 +82,10 @@ impl Deref for Identifier {
 impl Statement {
     pub fn accept<V: Visitor>(&self, visitor: &mut V) {
         visitor.visit_statement(self)
+    }
+
+    pub fn accept_mut<V: VisitorMut>(&mut self, visitor: &mut V) -> Result<(), CompileError> {
+        visitor.visit_statement_mut(self)
     }
 }
 

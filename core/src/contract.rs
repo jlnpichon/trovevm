@@ -28,6 +28,16 @@ pub struct ContractInstance {
     pub address: Address,
 }
 
+#[derive(Debug, Clone)]
+pub struct ContractEnv {
+    pub sender: Address,
+    pub self_address: Address,
+    pub value: u64,
+    pub block_number: u64,
+    pub timestamp: u64,
+    pub balance: u64,
+}
+
 impl ContractInstance {
     pub fn new(address: Address, contract: CompiledContract, storage: SharedStorage) -> Self {
         Self {

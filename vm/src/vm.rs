@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Add, rc::Rc};
 
 use tracing::trace;
 
@@ -52,7 +52,12 @@ impl VM {
             ContractInstance::new(address, contract.clone(), world_state.storage.clone());
 
         if let Some(init_method) = instance.get_method("init") {
-            self.call_method(init_method, Value::ContractInstance(instance.clone()), args)?;
+            self.call_method(
+                init_method,
+                Value::ContractInstance(instance.clone()),
+                args,
+                Some(instance.clone()),
+            )?;
         }
 
         world_state.registry.insert(address, contract);
@@ -76,10 +81,20 @@ impl VM {
 
         if let Some(init_method) = instance.get_method("init") {
             let args = init_args.unwrap_or_default();
-            self.call_method(init_method, Value::ContractInstance(instance.clone()), args)?;
+            self.call_method(
+                init_method,
+                Value::ContractInstance(instance.clone()),
+                args,
+                Some(instance.clone()),
+            )?;
         }
 
-        self.call_method(method, Value::ContractInstance(instance), args)
+        self.call_method(
+            method,
+            Value::ContractInstance(instance.clone()),
+            args,
+            Some(instance.clone()),
+        )
     }
 
     pub fn call_contract_method(
@@ -91,7 +106,13 @@ impl VM {
         let method = instance
             .get_method(method_name)
             .ok_or(RuntimeError::UndefinedVariable(method_name.to_string()))?;
-        self.call_method(method, Value::ContractInstance(instance), args)
+
+        self.call_method(
+            method,
+            Value::ContractInstance(instance.clone()),
+            args,
+            Some(instance),
+        )
     }
 
     pub fn call_method(
@@ -99,6 +120,7 @@ impl VM {
         method: CompiledFunction,
         this: Value,
         args: Vec<Value>,
+        instance: Option<ContractInstance>,
     ) -> Result<Value, RuntimeError> {
         let function_obj = Value::Function(method.clone());
         self.push(function_obj);
@@ -109,7 +131,7 @@ impl VM {
             self.push(arg);
         }
 
-        self.call(method, args_len + 1 /* this */)?;
+        self.call(method, args_len + 1 /* this */, instance)?;
         let result = self.run_loop()?;
 
         self.frames.pop();
@@ -140,7 +162,12 @@ impl VM {
             .get_method(method_name)
             .ok_or(RuntimeError::UndefinedVariable(method_name.to_string()))?;
 
-        self.call_method(method, Value::ContractInstance(instance.clone()), args)
+        self.call_method(
+            method,
+            Value::ContractInstance(instance.clone()),
+            args,
+            Some(instance.clone()),
+        )
     }
 
     pub fn push(&mut self, value: Value) {
@@ -223,13 +250,19 @@ impl VM {
             .ok_or(RuntimeError::InvalidConstantIndex(index))
     }
 
-    fn call(&mut self, function: CompiledFunction, args: usize) -> Result<(), RuntimeError> {
+    fn call(
+        &mut self,
+        function: CompiledFunction,
+        args: usize,
+        instance: Option<ContractInstance>,
+    ) -> Result<(), RuntimeError> {
         match function.kind {
             CompiledFunctionKind::Bytecode(_) => {
                 self.frames.push(CallFrame {
                     function,
                     ip: 0,
                     base: self.stack.len() - args - 1,
+                    instance,
                 });
             }
             CompiledFunctionKind::Native(name) => {
@@ -265,13 +298,23 @@ impl VM {
         let function_obj = Value::Function(function.clone());
         self.push(function_obj);
 
-        self.call(function, 0)?;
+        self.call(function, 0, None)?;
 
         self.run_loop()
     }
 
     pub fn eval(&mut self, function: CompiledFunction) -> Result<Value, RuntimeError> {
         todo!()
+    }
+
+    fn push_builtin(&mut self, name: &str) -> Result<(), RuntimeError> {
+        let value = self
+            .globals
+            .get(name)
+            .ok_or(RuntimeError::UndefinedBuiltinVariable(name.to_string()))?
+            .clone();
+        self.push(value);
+        Ok(())
     }
 
     fn run_loop(&mut self) -> Result<Value, RuntimeError> {
@@ -410,6 +453,30 @@ impl VM {
                     self.push(value);
                 }
 
+                Opcode::GetSender => self.push_builtin("msg.sender")?,
+                Opcode::GetValue => self.push_builtin("msg.value")?,
+                Opcode::GetData => self.push_builtin("msg.data")?,
+                Opcode::GetBalance => self.push_builtin("msg.balance")?,
+                Opcode::GetBlockNumber => self.push_builtin("block.number")?,
+                Opcode::GetBlockTimestamp => self.push_builtin("block.timestamp")?,
+                Opcode::GetBlockHash => self.push_builtin("block.hash")?,
+                Opcode::GetGasLimit => self.push_builtin("block.gas_limit")?,
+                Opcode::GetCoinBase => self.push_builtin("block.coinbase")?,
+                Opcode::Balance => {
+                    let addr = self.pop()?.as_number().ok_or(RuntimeError::TypeError(
+                        "GetBalance works only on address".to_string(),
+                    ))?;
+
+                    let instance = self
+                        .frames
+                        .last()
+                        .and_then(|frame| frame.instance.clone())
+                        .ok_or(RuntimeError::NoContractInstance)?;
+
+                    let balance = instance.storage.lock().get(addr as Address, "balance");
+                    self.push(balance.unwrap_or(Value::Null));
+                }
+
                 Opcode::Jump(offset) => {
                     *self.ip_mut()? += offset;
                     continue;
@@ -439,7 +506,11 @@ impl VM {
                         return Err(RuntimeError::WrongArgCount(arity, args_count));
                     }
 
-                    self.call(function, arity)?;
+                    self.call(
+                        function,
+                        arity,
+                        self.frames.last().and_then(|f| f.instance.clone()),
+                    )?;
 
                     // do not increment ip
                     continue;

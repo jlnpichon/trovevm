@@ -15,8 +15,8 @@ pub enum CompileCommandError {
 
 pub fn compile(input: InputSource) -> Result<CompiledProgram, CompileCommandError> {
     let source = input.read_to_string()?;
-    let program = trovec::parser::parse_program(input.source_name(), &source)
+    let mut program = trovec::parser::parse_program(input.source_name(), &source)
         .map_err(CompileCommandError::from)?;
-    trovec::codegen::compile(&program.statements)
+    trovec::codegen::compile(&mut program.statements)
         .map_err(|e| CompileCommandError::Compile(e.into()))
 }
