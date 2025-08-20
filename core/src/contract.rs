@@ -32,6 +32,7 @@ pub struct ContractInstance {
 pub struct ContractEnv {
     pub sender: Address,
     pub self_address: Address,
+    pub instance: ContractInstance,
     pub value: u64,
     pub block_number: u64,
     pub timestamp: u64,
@@ -60,8 +61,12 @@ impl ContractInstance {
     }
 
     pub fn var_exists(&self, name: &String) -> bool {
-        self.contract.var_exists(name)
+        is_builtin_var(name) || self.contract.var_exists(name)
     }
+}
+
+pub fn is_builtin_var(name: &str) -> bool {
+    matches!(name, "balance" | "owner" | "address")
 }
 
 impl CompiledContract {
@@ -89,7 +94,7 @@ impl CompiledContract {
     pub fn default_storage(&self) -> SharedStorage {
         let storage = SharedStorage::default();
         let instance_address = 0;
-        storage.lock().init_instance(instance_address, self);
+        storage.lock().init_instance(0, instance_address, self);
         storage
     }
 }

@@ -1,10 +1,11 @@
-use std::{collections::HashMap, ops::Add, rc::Rc};
+use std::collections::HashMap;
 
 use tracing::trace;
 
 use trove_core::{
-    Address, CompiledFunction, ContractInstance, Opcode, Program, RuntimeError, Value, WorldState,
-    contract::CompiledContract,
+    Address, CompiledFunction, ContractEnv, ContractInstance, Opcode, Program, RuntimeError, Value,
+    WorldState,
+    contract::{CompiledContract, is_builtin_var},
     function::{Callable, CompiledFunctionKind, ExecContext},
     value::Op,
 };
@@ -29,6 +30,7 @@ impl VM {
     pub fn new() -> Self {
         let mut globals = HashMap::new();
         let mut natives = HashMap::new();
+
         install_natives(&mut globals, &mut natives);
 
         Self {
@@ -41,22 +43,36 @@ impl VM {
 
     pub fn deploy(
         &mut self,
+        sender: Address,
         contract: CompiledContract,
         args: Vec<Value>,
         world_state: &mut WorldState,
     ) -> Result<ContractInstance, RuntimeError> {
         let address = world_state.generate_address();
-        world_state.storage.lock().init_instance(address, &contract);
+        world_state
+            .storage
+            .lock()
+            .init_instance(sender, address, &contract);
 
         let instance =
             ContractInstance::new(address, contract.clone(), world_state.storage.clone());
+
+        let env = ContractEnv {
+            sender: 0,
+            self_address: address,
+            instance: instance.clone(),
+            value: 0,
+            block_number: 0,
+            timestamp: 0,
+            balance: 0,
+        };
 
         if let Some(init_method) = instance.get_method("init") {
             self.call_method(
                 init_method,
                 Value::ContractInstance(instance.clone()),
                 args,
-                Some(instance.clone()),
+                Some(env),
             )?;
         }
 
@@ -79,13 +95,23 @@ impl VM {
             .get_method(method_name)
             .ok_or(RuntimeError::UndefinedVariable(method_name.to_string()))?;
 
+        let env = ContractEnv {
+            sender: 0,
+            self_address: 0,
+            instance: instance.clone(),
+            value: 0,
+            block_number: 0,
+            timestamp: 0,
+            balance: 0,
+        };
+
         if let Some(init_method) = instance.get_method("init") {
             let args = init_args.unwrap_or_default();
             self.call_method(
                 init_method,
                 Value::ContractInstance(instance.clone()),
                 args,
-                Some(instance.clone()),
+                Some(env.clone()),
             )?;
         }
 
@@ -93,34 +119,49 @@ impl VM {
             method,
             Value::ContractInstance(instance.clone()),
             args,
-            Some(instance.clone()),
+            Some(env),
         )
     }
 
     pub fn call_contract_method(
         &mut self,
-        instance: ContractInstance,
         method_name: &str,
         args: Vec<Value>,
+        env: ContractEnv,
     ) -> Result<Value, RuntimeError> {
-        let method = instance
+        // TODO: get caller balance and check that env.value is less than this
+        // withdraw the value from caller
+        // increment this.balance with value
+        // rollback if fail
+        let saved_globals = std::mem::take(&mut self.globals);
+        let mut injected_globals = saved_globals.clone();
+
+        inject_builtins_variables(&mut injected_globals, &env);
+        self.globals = injected_globals;
+
+        let method = env
+            .instance
             .get_method(method_name)
             .ok_or(RuntimeError::UndefinedVariable(method_name.to_string()))?;
 
-        self.call_method(
+        let result = self.call_method(
             method,
-            Value::ContractInstance(instance.clone()),
+            Value::ContractInstance(env.instance.clone()),
             args,
-            Some(instance),
-        )
+            Some(env),
+        )?;
+
+        self.globals = saved_globals;
+
+        Ok(result)
     }
 
-    pub fn call_method(
+    fn call_method(
         &mut self,
         method: CompiledFunction,
         this: Value,
         args: Vec<Value>,
-        instance: Option<ContractInstance>,
+        env: Option<ContractEnv>,
     ) -> Result<Value, RuntimeError> {
         let function_obj = Value::Function(method.clone());
         self.push(function_obj);
@@ -131,7 +172,7 @@ impl VM {
             self.push(arg);
         }
 
-        self.call(method, args_len + 1 /* this */, instance)?;
+        self.call(method, args_len + 1 /* this */, env)?;
         let result = self.run_loop()?;
 
         self.frames.pop();
@@ -139,6 +180,7 @@ impl VM {
         Ok(result)
     }
 
+    /*
     fn run_transaction(
         &mut self,
         caller: Address,
@@ -169,6 +211,7 @@ impl VM {
             Some(instance.clone()),
         )
     }
+    */
 
     pub fn push(&mut self, value: Value) {
         self.stack.push(value)
@@ -254,7 +297,7 @@ impl VM {
         &mut self,
         function: CompiledFunction,
         args: usize,
-        instance: Option<ContractInstance>,
+        env: Option<ContractEnv>,
     ) -> Result<(), RuntimeError> {
         match function.kind {
             CompiledFunctionKind::Bytecode(_) => {
@@ -262,7 +305,7 @@ impl VM {
                     function,
                     ip: 0,
                     base: self.stack.len() - args - 1,
-                    instance,
+                    env,
                 });
             }
             CompiledFunctionKind::Native(name) => {
@@ -408,6 +451,7 @@ impl VM {
                             .ok_or(RuntimeError::TypeError(
                                 "GetField: constant must be a string".into(),
                             ))?;
+
                     let mut this = self
                         .stack_top()
                         .ok_or(RuntimeError::StackUnderflow)?
@@ -435,6 +479,11 @@ impl VM {
                             "GetField: constant must be a string".into(),
                         ))?
                         .clone();
+
+                    if is_builtin_var(&field_name) {
+                        return Err(RuntimeError::ReadOnlyField(field_name.to_string()));
+                    }
+
                     let value = self.pop()?;
                     let mut this = self
                         .stack_top()
@@ -464,14 +513,15 @@ impl VM {
                 Opcode::GetCoinBase => self.push_builtin("block.coinbase")?,
                 Opcode::Balance => {
                     let addr = self.pop()?.as_number().ok_or(RuntimeError::TypeError(
-                        "GetBalance works only on address".to_string(),
+                        "Balance works only on address".to_string(),
                     ))?;
 
                     let instance = self
                         .frames
                         .last()
-                        .and_then(|frame| frame.instance.clone())
-                        .ok_or(RuntimeError::NoContractInstance)?;
+                        .and_then(|frame| frame.env.clone())
+                        .ok_or(RuntimeError::NoContractInstance)?
+                        .instance;
 
                     let balance = instance.storage.lock().get(addr as Address, "balance");
                     self.push(balance.unwrap_or(Value::Null));
@@ -509,7 +559,7 @@ impl VM {
                     self.call(
                         function,
                         arity,
-                        self.frames.last().and_then(|f| f.instance.clone()),
+                        self.frames.last().and_then(|f| f.env.clone()),
                     )?;
 
                     // do not increment ip
@@ -554,4 +604,18 @@ fn trace(ip: usize, opcode: &Opcode, stack: &[Value]) {
     let ip_str = format!("IP={:02}", ip).bright_blue().to_string();
 
     trace!("[{}] {:<25} | Stack: [{}]", ip_str, op_str, stack_str);
+}
+
+fn inject_builtins_variables(injected: &mut HashMap<String, Value>, env: &ContractEnv) {
+    injected.insert("msg.sender".into(), Value::Number(env.sender as f64));
+    injected.insert("msg.balance".into(), Value::Number(env.balance as f64));
+    injected.insert("msg.value".into(), Value::Number(env.value as f64));
+    injected.insert(
+        "block.number".into(),
+        Value::Number(env.block_number as f64),
+    );
+    injected.insert(
+        "block.timestamp".into(),
+        Value::Number(env.timestamp as f64),
+    );
 }

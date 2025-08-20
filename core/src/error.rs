@@ -30,6 +30,10 @@ pub enum RuntimeError {
     WrongArgCount(usize, usize),
     #[error("no contract definition found for the given address")]
     ContractNotFound,
+    #[error("No contract environment associated with the VM")]
+    NoContractEnv,
     #[error("No contract instance associated with the VM")]
     NoContractInstance,
+    #[error("Field '{0}' is read only")]
+    ReadOnlyField(String),
 }

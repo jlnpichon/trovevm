@@ -1,9 +1,9 @@
-use trove_core::{CompiledFunction, ContractInstance};
+use trove_core::{CompiledFunction, ContractEnv};
 
 #[derive(Debug, Clone)]
 pub struct CallFrame {
     pub function: CompiledFunction,
     pub ip: usize,
     pub base: usize,
-    pub instance: Option<ContractInstance>,
+    pub env: Option<ContractEnv>,
 }

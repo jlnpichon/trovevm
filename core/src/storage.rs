@@ -44,7 +44,7 @@ impl SharedStorage {
 pub trait StorageBackend: Debug + Send + Sync {
     fn get(&self, address: Address, key: &str) -> Option<Value>;
     fn set(&mut self, address: Address, key: &str, value: Value);
-    fn init_instance(&mut self, address: Address, contract: &CompiledContract);
+    fn init_instance(&mut self, sender: Address, address: Address, contract: &CompiledContract);
 }
 
 #[derive(Debug, Clone, Default)]
@@ -70,12 +70,15 @@ impl StorageBackend for InMemoryStorage {
             .insert(key.to_string(), value);
     }
 
-    fn init_instance(&mut self, address: Address, contract: &CompiledContract) {
+    fn init_instance(&mut self, sender: Address, address: Address, contract: &CompiledContract) {
         let mut instance_map = HashMap::new();
 
         for var in &contract.vars {
             instance_map.insert(var.clone(), Value::Null);
         }
+
+        instance_map.insert("balance".to_string(), Value::Number(0.));
+        instance_map.insert("owner".to_string(), Value::Number(sender as f64));
 
         self.memory.insert(address, instance_map);
     }
