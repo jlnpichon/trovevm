@@ -391,6 +391,23 @@ impl Visitor for Compiler {
                 let index = self.define_constant(Value::String(name.clone()));
                 self.emit_opcode(Opcode::SetField(index));
             }
+            Expr::IndexGet { object, index } => {
+                object.accept(self);
+                index.accept(self);
+
+                self.emit_opcode(Opcode::IndexGet);
+            }
+            Expr::IndexSet {
+                object,
+                index,
+                value,
+            } => {
+                object.accept(self);
+                index.accept(self);
+                value.accept(self);
+
+                self.emit_opcode(Opcode::IndexSet);
+            }
             Expr::Assign { target, value } => {
                 value.accept(self);
 

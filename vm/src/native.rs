@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::SystemTime};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, time::SystemTime};
 
 use trove_core::{
     CompiledFunction, RuntimeError, Value,
@@ -33,15 +33,16 @@ impl Callable for Native {
 }
 
 pub fn install_natives(
-    globals: &mut HashMap<String, Value>,
+    globals: &mut HashMap<String, Rc<RefCell<Value>>>,
     natives: &mut HashMap<String, Box<dyn Callable>>,
 ) {
     define_native(globals, natives, "clock", 0, clock);
     define_native(globals, natives, "error", 1, error);
+    define_native(globals, natives, "map", 0, map);
 }
 
 fn define_native(
-    globals: &mut HashMap<String, Value>,
+    globals: &mut HashMap<String, Rc<RefCell<Value>>>,
     natives: &mut HashMap<String, Box<dyn Callable>>,
     name: &'static str,
     arity: usize,
@@ -51,11 +52,11 @@ fn define_native(
     natives.insert(name.into(), Box::new(native));
     globals.insert(
         name.into(),
-        Value::Function(CompiledFunction {
+        Rc::new(RefCell::new(Value::Function(CompiledFunction {
             kind: CompiledFunctionKind::Native(name.to_string()),
             name: name.to_string(),
             arity,
-        }),
+        }))),
     );
 }
 
@@ -82,4 +83,8 @@ fn error(args: &[Value], _: &mut dyn ExecContext) -> Result<Value, RuntimeError>
     })?;
 
     Err(RuntimeError::ContractError(message.to_string()))
+}
+
+fn map(_: &[Value], _: &mut dyn ExecContext) -> Result<Value, RuntimeError> {
+    Ok(Value::Map(HashMap::new()))
 }

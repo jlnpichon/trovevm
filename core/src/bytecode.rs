@@ -31,6 +31,9 @@ pub enum Opcode {
     GetField(usize),
     SetField(usize),
 
+    IndexGet,
+    IndexSet,
+
     GetSender,
     GetValue,
     GetData,

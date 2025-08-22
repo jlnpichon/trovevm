@@ -1,4 +1,8 @@
-use std::collections::HashMap;
+use std::{
+    cell::{Ref, RefCell},
+    collections::HashMap,
+    rc::Rc,
+};
 
 use tracing::trace;
 
@@ -14,8 +18,8 @@ use crate::{function::CallFrame, native::install_natives};
 
 #[derive(Debug)]
 pub struct VM {
-    stack: Vec<Value>, // TODO: limit
-    globals: HashMap<String, Value>,
+    stack: Vec<Rc<RefCell<Value>>>, // TODO: limit
+    globals: HashMap<String, Rc<RefCell<Value>>>,
     natives: HashMap<String, Box<dyn Callable>>,
     frames: Vec<CallFrame>, // TODO: limit
 }
@@ -141,7 +145,7 @@ impl VM {
     fn prepare_transaction(
         &self,
         env: &ContractEnv,
-    ) -> Result<(f64, f64, HashMap<String, Value>), RuntimeError> {
+    ) -> Result<(f64, f64, HashMap<String, Rc<RefCell<Value>>>), RuntimeError> {
         let storage = env.instance.storage.clone(); // Arc::clone
         let sender_balance = storage
             .lock()
@@ -223,12 +227,12 @@ impl VM {
         env: Option<ContractEnv>,
     ) -> Result<Value, RuntimeError> {
         let function_obj = Value::Function(method.clone());
-        self.push(function_obj);
+        self.push(Rc::new(RefCell::new(function_obj)));
 
         let args_len = args.len();
-        self.push(this);
+        self.push(Rc::new(RefCell::new(this)));
         for arg in args {
-            self.push(arg);
+            self.push(Rc::new(RefCell::new(arg)));
         }
 
         self.call(method, args_len + 1 /* this */, env)?;
@@ -239,16 +243,16 @@ impl VM {
         Ok(result)
     }
 
-    pub fn push(&mut self, value: Value) {
+    pub fn push(&mut self, value: Rc<RefCell<Value>>) {
         self.stack.push(value)
     }
 
-    pub fn pop(&mut self) -> Result<Value, RuntimeError> {
+    pub fn pop(&mut self) -> Result<Rc<RefCell<Value>>, RuntimeError> {
         self.stack.pop().ok_or(RuntimeError::StackUnderflow)
     }
 
-    pub fn stack_top(&self) -> Option<&Value> {
-        self.stack.last()
+    pub fn stack_top(&self) -> Option<Rc<RefCell<Value>>> {
+        self.stack.last().cloned()
     }
 
     pub fn stack_len(&self) -> Result<usize, RuntimeError> {
@@ -256,7 +260,7 @@ impl VM {
         Ok(self.stack.len() - frame.base)
     }
 
-    pub fn stack_peek_from_top(&self, offset: usize) -> Result<&Value, RuntimeError> {
+    pub fn stack_peek_from_top(&self, offset: usize) -> Result<Ref<Value>, RuntimeError> {
         let index = self
             .stack
             .len()
@@ -265,16 +269,22 @@ impl VM {
         self.stack
             .get(index)
             .ok_or(RuntimeError::StackIndexOutOfBound(index))
+            .map(|v| v.borrow())
     }
 
-    pub fn stack_peek(&self, index: usize) -> Result<&Value, RuntimeError> {
+    pub fn stack_peek(&self, index: usize) -> Result<Rc<RefCell<Value>>, RuntimeError> {
         let frame = self.frames.last().ok_or(RuntimeError::NoCallFrame)?;
         self.stack
             .get(frame.base + index + 1)
+            .cloned()
             .ok_or(RuntimeError::StackIndexOutOfBound(index))
     }
 
-    pub fn stack_set(&mut self, index: usize, value: Value) -> Result<(), RuntimeError> {
+    pub fn stack_set(
+        &mut self,
+        index: usize,
+        value: Rc<RefCell<Value>>,
+    ) -> Result<(), RuntimeError> {
         let frame = self.frames.last().ok_or(RuntimeError::NoCallFrame)?;
 
         if let Some(slot) = self.stack.get_mut(frame.base + index + 1) {
@@ -288,8 +298,8 @@ impl VM {
     fn apply_binop(&mut self, op: Op) -> Result<(), RuntimeError> {
         let rhs = self.pop()?;
         let lhs = self.pop()?;
-        let value = lhs.try_apply(op, Some(&rhs))?;
-        self.push(value);
+        let value = lhs.borrow().try_apply(op, Some(&rhs.borrow()))?;
+        self.push(Rc::new(RefCell::new(value)));
         Ok(())
     }
 
@@ -345,7 +355,7 @@ impl VM {
                     self.pop()?;
                 }
                 self.pop()?; // native function object
-                self.push(value);
+                self.push(Rc::new(RefCell::new(value)));
                 *self.ip_mut()? += 1;
             }
         };
@@ -365,7 +375,7 @@ impl VM {
 
     pub fn run(&mut self, function: CompiledFunction) -> Result<Value, RuntimeError> {
         let function_obj = Value::Function(function.clone());
-        self.push(function_obj);
+        self.push(Rc::new(RefCell::new(function_obj)));
 
         self.call(function, 0, None)?;
 
@@ -400,8 +410,8 @@ impl VM {
                 Opcode::Mod => self.apply_binop(Op::Mod)?,
                 Opcode::Neg => {
                     let lhs = self.pop()?;
-                    let value = lhs.try_apply(Op::Neg, None)?;
-                    self.push(value);
+                    let value = lhs.borrow().try_apply(Op::Neg, None)?;
+                    self.push(Rc::new(RefCell::new(value)));
                 }
 
                 Opcode::Lt => self.apply_binop(Op::Lt)?,
@@ -416,7 +426,7 @@ impl VM {
                 }
                 Opcode::Push(index) => {
                     let value = self.constant_get(index)?;
-                    self.push(value.clone());
+                    self.push(Rc::new(RefCell::new(value.clone())));
                 }
 
                 Opcode::DefineGlobal(index) => {
@@ -468,34 +478,46 @@ impl VM {
                 }
                 Opcode::SetLocal(index) => {
                     let value = self.stack_top().ok_or(RuntimeError::StackUnderflow)?;
-                    self.stack_set(index, value.clone())?;
+                    self.stack_set(index, value)?;
                 }
                 Opcode::GetField(index) => {
-                    let field_name =
-                        self.constant_get(index)?
-                            .as_string()
-                            .ok_or(RuntimeError::TypeError(
-                                "GetField: constant must be a string".into(),
-                            ))?;
+                    let field_name = self
+                        .constant_get(index)?
+                        .as_string()
+                        .ok_or(RuntimeError::TypeError(
+                            "GetField: constant must be a string".into(),
+                        ))?
+                        .clone();
 
                     let mut this = self
                         .stack_top()
                         .ok_or(RuntimeError::StackUnderflow)?
+                        .borrow()
                         .as_instance()
                         .ok_or(RuntimeError::TypeError(
                             "'this' must be a contract instance".into(),
                         ))?
                         .clone();
+                    /*
+                    let mut this = self
+                        .pop()?
+                        .borrow_mut()
+                        .as_instance()
+                        .ok_or(RuntimeError::TypeError(
+                            "'this' must be a contract instance".into(),
+                        ))?
+                        .clone();
+                    */
 
-                    if !this.var_exists(field_name) {
+                    if !this.var_exists(&field_name) {
                         return Err(RuntimeError::UndefinedVariable(field_name.clone()));
                     }
 
                     let value = this
-                        .get_field(field_name)
+                        .get_field(&field_name)
                         .ok_or(RuntimeError::UndefinedVariable(field_name.clone()))?;
 
-                    self.push(value);
+                    self.push(Rc::new(RefCell::new(value)));
                 }
                 Opcode::SetField(index) => {
                     let field_name = self
@@ -514,6 +536,7 @@ impl VM {
                     let mut this = self
                         .stack_top()
                         .ok_or(RuntimeError::StackUnderflow)?
+                        .borrow()
                         .as_instance()
                         .ok_or(RuntimeError::TypeError(
                             "'this' must be a contract instance".into(),
@@ -524,7 +547,41 @@ impl VM {
                         return Err(RuntimeError::UndefinedVariable(field_name.clone()));
                     }
 
-                    this.set_field(&field_name, value.clone());
+                    this.set_field(&field_name, value.borrow().clone() /* Deep clone */);
+                    self.push(value);
+                }
+                Opcode::IndexGet => {
+                    let index = self.pop()?;
+                    let map = self
+                        .pop()?
+                        .borrow()
+                        .as_map()
+                        .ok_or(RuntimeError::TypeError(
+                            "Only map can be indexed".to_string(),
+                        ))?
+                        .clone();
+
+                    let value = map
+                        .get(&index.borrow().to_string())
+                        .unwrap_or(&Value::Null)
+                        .clone();
+
+                    self.push(Rc::new(RefCell::new(value)));
+                }
+                Opcode::IndexSet => {
+                    let value = self.pop()?;
+                    let index = self.pop()?;
+                    self.pop()?
+                        .borrow_mut()
+                        .as_map_mut()
+                        .ok_or(RuntimeError::TypeError(
+                            "Only map can be indexed".to_string(),
+                        ))?
+                        .insert(
+                            index.borrow().to_string(),
+                            value.borrow().clone(), /* Deep clone */
+                        );
+
                     self.push(value);
                 }
 
@@ -538,9 +595,13 @@ impl VM {
                 Opcode::GetGasLimit => self.push_builtin("block.gas_limit")?,
                 Opcode::GetCoinBase => self.push_builtin("block.coinbase")?,
                 Opcode::Balance => {
-                    let addr = self.pop()?.as_number().ok_or(RuntimeError::TypeError(
-                        "Balance works only on address".to_string(),
-                    ))?;
+                    let addr = self
+                        .pop()?
+                        .borrow()
+                        .as_number()
+                        .ok_or(RuntimeError::TypeError(
+                            "Balance works only on address".to_string(),
+                        ))?;
 
                     let instance = self
                         .frames
@@ -549,8 +610,12 @@ impl VM {
                         .ok_or(RuntimeError::NoContractInstance)?
                         .instance;
 
-                    let balance = instance.storage.lock().get(addr as Address, "balance");
-                    self.push(balance.unwrap_or(Value::Null));
+                    let balance = instance
+                        .storage
+                        .lock()
+                        .get(addr as Address, "balance")
+                        .unwrap_or(Value::Null);
+                    self.push(Rc::new(RefCell::new(balance)));
                 }
 
                 Opcode::Jump(offset) => {
@@ -559,7 +624,7 @@ impl VM {
                 }
                 Opcode::JumpIfFalse(offset) => {
                     let condition = self.stack_top().ok_or(RuntimeError::StackUnderflow)?;
-                    if !condition.is_truthy() {
+                    if !condition.borrow().is_truthy() {
                         *self.ip_mut()? += offset;
                         continue;
                     }
@@ -593,7 +658,7 @@ impl VM {
                 }
                 Opcode::Return => {
                     let return_value = if self.stack.len() > 1 {
-                        self.pop()?
+                        self.pop()?.borrow().clone()
                     } else {
                         Value::Null
                     };
@@ -604,7 +669,7 @@ impl VM {
                         for _ in 0..pop_count {
                             self.pop()?;
                         }
-                        self.push(return_value);
+                        self.push(Rc::new(RefCell::new(return_value)));
                     } else {
                         self.pop()?; // main function
                         return Ok(return_value);
@@ -618,13 +683,13 @@ impl VM {
 
 impl ExecContext for VM {}
 
-fn trace(ip: usize, opcode: &Opcode, stack: &[Value]) {
+fn trace(ip: usize, opcode: &Opcode, stack: &[Rc<RefCell<Value>>]) {
     use owo_colors::OwoColorize;
 
     let op_str = format!("{:?}", opcode).yellow().to_string();
     let stack_str = stack
         .iter()
-        .map(|v| format!("{}", v).red().to_string())
+        .map(|v| format!("{}", v.borrow()).red().to_string())
         .collect::<Vec<_>>()
         .join(", ");
     let ip_str = format!("IP={:02}", ip).bright_blue().to_string();
@@ -633,19 +698,28 @@ fn trace(ip: usize, opcode: &Opcode, stack: &[Value]) {
 }
 
 fn inject_builtins_variables(
-    injected: &mut HashMap<String, Value>,
+    injected: &mut HashMap<String, Rc<RefCell<Value>>>,
     env: &ContractEnv,
     sender_balance: f64,
 ) {
-    injected.insert("msg.sender".into(), Value::Number(env.sender as f64));
-    injected.insert("msg.balance".into(), Value::Number(sender_balance));
-    injected.insert("msg.value".into(), Value::Number(env.value as f64));
+    injected.insert(
+        "msg.sender".into(),
+        Rc::new(RefCell::new(Value::Number(env.sender as f64))),
+    );
+    injected.insert(
+        "msg.balance".into(),
+        Rc::new(RefCell::new(Value::Number(sender_balance))),
+    );
+    injected.insert(
+        "msg.value".into(),
+        Rc::new(RefCell::new(Value::Number(env.value as f64))),
+    );
     injected.insert(
         "block.number".into(),
-        Value::Number(env.block_number as f64),
+        Rc::new(RefCell::new(Value::Number(env.block_number as f64))),
     );
     injected.insert(
         "block.timestamp".into(),
-        Value::Number(env.timestamp as f64),
+        Rc::new(RefCell::new(Value::Number(env.timestamp as f64))),
     );
 }

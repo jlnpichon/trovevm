@@ -1,6 +1,4 @@
-use std::fmt;
-
-//use crate::core::ast::Literal;
+use std::{collections::HashMap, fmt};
 
 use serde::{Deserialize, Serialize};
 
@@ -8,7 +6,7 @@ use super::{contract::ContractInstance, function::CompiledFunction};
 use crate::error::RuntimeError;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", content = "value")]
+#[serde(tag = "type", content = "data")]
 pub enum Value {
     Number(f64),
     String(String),
@@ -16,6 +14,7 @@ pub enum Value {
     Null,
     Function(CompiledFunction),
     ContractInstance(ContractInstance),
+    Map(HashMap<String, Value>),
 }
 
 #[derive(Debug, Clone)]
@@ -107,6 +106,7 @@ impl Value {
             Value::Bool(b) => *b,
             Value::Function(_) => true,
             Value::ContractInstance(_) => true,
+            Value::Map(_) => true,
             Value::Null => false,
         }
     }
@@ -125,9 +125,30 @@ impl Value {
         }
     }
 
+    pub fn as_instance_mut(&mut self) -> Option<&mut ContractInstance> {
+        match self {
+            Value::ContractInstance(instance) => Some(instance),
+            _ => None,
+        }
+    }
+
     pub fn as_number(&self) -> Option<f64> {
         match self {
             Value::Number(n) => Some(*n),
+            _ => None,
+        }
+    }
+
+    pub fn as_map(&self) -> Option<&HashMap<String, Value>> {
+        match self {
+            Value::Map(m) => Some(m),
+            _ => None,
+        }
+    }
+
+    pub fn as_map_mut(&mut self) -> Option<&mut HashMap<String, Value>> {
+        match self {
+            Value::Map(m) => Some(m),
             _ => None,
         }
     }
@@ -152,6 +173,7 @@ impl Value {
             Value::String(_) => "String",
             Value::Bool(_) => "Bool",
             Value::Null => "Null",
+            Value::Map(_) => "Map",
             Value::Function(_) => "Function",
             Value::ContractInstance(_) => "ContractInstance",
         }
@@ -199,6 +221,7 @@ impl fmt::Display for Value {
             Value::String(s) => write!(f, "{s}"),
             Value::Bool(b) => write!(f, "{b}"),
             Value::Null => write!(f, "Null"),
+            Value::Map(map) => write!(f, "{map:?}"),
             Value::Function(function) => {
                 write!(
                     f,

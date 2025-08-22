@@ -43,7 +43,7 @@ expr = { unary_op? ~ unary_expr ~ (bin_op ~ unary_op? ~ unary_expr)* }
 
 unary_expr = { (Literal | Identifier | grouped_expr) ~ call_suffix* }
 
-call_suffix = { (LPAREN ~ args? ~ RPAREN) | DOT ~ Identifier }
+call_suffix = { (LPAREN ~ args? ~ RPAREN) | DOT ~ Identifier | LBRACKET ~ expr ~ RBRACKET }
 
 grouped_expr = { "(" ~ expr ~ ")" }
 
@@ -108,6 +108,8 @@ LPAREN    = @{ "(" }
 RPAREN    = @{ ")" }
 LBRACE    = @{ "{" }
 RBRACE    = @{ "}" }
+LBRACKET  = @{ "[" }
+RBRACKET  = @{ "]" }
 COMMA     = @{ "," }
 EQEQ      = @{ "==" }
 EQ        = @{ "=" }

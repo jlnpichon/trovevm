@@ -34,6 +34,15 @@ pub enum Expr {
         name: String,
         value: Box<Expr>,
     },
+    IndexGet {
+        object: Box<Expr>,
+        index: Box<Expr>,
+    },
+    IndexSet {
+        object: Box<Expr>,
+        index: Box<Expr>,
+        value: Box<Expr>,
+    },
     FnCall {
         callee: Box<Expr>,
         args: Vec<Expr>,

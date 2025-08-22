@@ -155,14 +155,23 @@ pub fn expr(pairs: &mut pest::iterators::Pairs<Rule>) -> Result<Expr, PestError>
                                 object: expression.into(),
                                 name: name.as_str().to_string(),
                             };
-                        } else {
-                            expect_rule(&mut inner, Rule::LPAREN)?;
+                        } else if accept_rule(&mut inner, Rule::LPAREN).is_some() {
+                            //expect_rule(&mut inner, Rule::LPAREN)?;
                             let args = args(&mut inner)?;
                             expression = Expr::FnCall {
                                 callee: Box::new(expression),
                                 args,
                             };
                             expect_rule(&mut inner, Rule::RPAREN)?;
+                        } else {
+                            expect_rule(&mut inner, Rule::LBRACKET)?;
+                            let mut pairs = inner.next().unwrap().into_inner();
+                            let index = expr(&mut pairs)?;
+                            expression = Expr::IndexGet {
+                                object: expression.into(),
+                                index: index.into(),
+                            };
+                            expect_rule(&mut inner, Rule::RBRACKET)?;
                         }
                     }
                     _ => panic!("unexpected suffix: {:?}", suffix.as_rule()),
@@ -184,6 +193,11 @@ pub fn expr(pairs: &mut pest::iterators::Pairs<Rule>) -> Result<Expr, PestError>
                     Expr::Get { object, name } => Ok(Expr::Set {
                         object,
                         name,
+                        value: rhs?.into(),
+                    }),
+                    Expr::IndexGet { object, index } => Ok(Expr::IndexSet {
+                        object,
+                        index,
                         value: rhs?.into(),
                     }),
                     lhs => Ok(Expr::Assign {
