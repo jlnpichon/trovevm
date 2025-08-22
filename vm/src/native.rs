@@ -37,6 +37,7 @@ pub fn install_natives(
     natives: &mut HashMap<String, Box<dyn Callable>>,
 ) {
     define_native(globals, natives, "clock", 0, clock);
+    define_native(globals, natives, "error", 1, error);
 }
 
 fn define_native(
@@ -63,4 +64,22 @@ fn clock(_: &[Value], _: &mut dyn ExecContext) -> Result<Value, RuntimeError> {
         Ok(n) => Ok(Value::Number(n.as_secs() as f64)),
         Err(_) => todo!(),
     }
+}
+
+fn error(args: &[Value], _: &mut dyn ExecContext) -> Result<Value, RuntimeError> {
+    if args.len() != 1 {
+        return Err(RuntimeError::ArityMismatch {
+            expected: 1,
+            got: args.len(),
+            name: "error",
+        });
+    }
+
+    let message = args[0].as_string().ok_or(RuntimeError::TypeMismatch {
+        expected: "String",
+        got: args[0].type_name(),
+        name: "error",
+    })?;
+
+    Err(RuntimeError::ContractError(message.to_string()))
 }

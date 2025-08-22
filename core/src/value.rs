@@ -145,6 +145,17 @@ impl Value {
             _ => None,
         }
     }
+
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            Value::Number(_) => "Number",
+            Value::String(_) => "String",
+            Value::Bool(_) => "Bool",
+            Value::Null => "Null",
+            Value::Function(_) => "Function",
+            Value::ContractInstance(_) => "ContractInstance",
+        }
+    }
 }
 
 impl PartialEq for Value {

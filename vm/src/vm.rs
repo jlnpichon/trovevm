@@ -5,7 +5,7 @@ use tracing::trace;
 use trove_core::{
     Address, CompiledFunction, ContractEnv, ContractInstance, Opcode, Program, RuntimeError, Value,
     WorldState,
-    contract::{CompiledContract, is_builtin_var},
+    contract::{CompiledContract, ContractOrInstance, is_builtin_var},
     function::{Callable, CompiledFunctionKind, ExecContext},
     value::Op,
 };
@@ -64,7 +64,6 @@ impl VM {
             value: 0,
             block_number: 0,
             timestamp: 0,
-            balance: 0,
         };
 
         if let Some(init_method) = instance.get_method("init") {
@@ -76,43 +75,53 @@ impl VM {
             )?;
         }
 
-        world_state.registry.insert(address, contract);
+        world_state
+            .instances
+            .insert(instance.address, instance.clone());
 
         Ok(instance)
     }
 
     pub fn sandbox_call(
         &mut self,
-        contract: CompiledContract,
+        target: ContractOrInstance,
         method_name: &str,
+        sender: Option<Address>,
+        value: Option<u64>,
         args: Vec<Value>,
         init_args: Option<Vec<Value>>,
     ) -> Result<Value, RuntimeError> {
-        let storage = contract.default_storage();
-        let instance = ContractInstance::new(0, contract, storage);
+        let (instance, do_init) = match target {
+            ContractOrInstance::Contract(contract) => {
+                let storage = contract.default_storage();
+                (ContractInstance::new(0, contract, storage), true)
+            }
+            ContractOrInstance::Instance(instance) => (instance, false),
+        };
 
         let method = instance
             .get_method(method_name)
             .ok_or(RuntimeError::UndefinedVariable(method_name.to_string()))?;
 
         let env = ContractEnv {
-            sender: 0,
-            self_address: 0,
+            sender: sender.unwrap_or(0),
+            self_address: instance.address,
             instance: instance.clone(),
-            value: 0,
+            value: value.unwrap_or(0),
             block_number: 0,
             timestamp: 0,
-            balance: 0,
         };
 
-        if let Some(init_method) = instance.get_method("init") {
-            let args = init_args.unwrap_or_default();
-            self.call_method(
-                init_method,
-                Value::ContractInstance(instance.clone()),
-                args,
-                Some(env.clone()),
-            )?;
+        if do_init {
+            if let Some(init_method) = instance.get_method("init") {
+                let args = init_args.unwrap_or_default();
+                self.call_method(
+                    init_method,
+                    Value::ContractInstance(instance.clone()),
+                    args,
+                    Some(env.clone()),
+                )?;
+            }
         }
 
         self.call_method(
@@ -123,21 +132,69 @@ impl VM {
         )
     }
 
+    fn inject_env(&mut self, env: &ContractEnv, sender_balance: f64) {
+        let mut injected_globals = self.globals.clone();
+        inject_builtins_variables(&mut injected_globals, env, sender_balance);
+        self.globals = injected_globals;
+    }
+
+    fn prepare_transaction(
+        &self,
+        env: &ContractEnv,
+    ) -> Result<(f64, f64, HashMap<String, Value>), RuntimeError> {
+        let storage = env.instance.storage.clone(); // Arc::clone
+        let sender_balance = storage
+            .lock()
+            .get(env.sender, "balance")
+            .ok_or(RuntimeError::UndefinedVariable("sender.balance".into()))?
+            .as_number()
+            .ok_or(RuntimeError::TypeError("balance must be a number".into()))?;
+
+        if sender_balance < (env.value as f64) {
+            return Err(RuntimeError::InsufficientFunds);
+        }
+
+        let instance_balance = storage
+            .lock()
+            .get(env.instance.address, "balance")
+            .ok_or(RuntimeError::UndefinedVariable("instance.balance".into()))?
+            .as_number()
+            .ok_or(RuntimeError::TypeError("balance must be a number".into()))?;
+
+        let saved_globals = self.globals.clone();
+
+        Ok((sender_balance, instance_balance, saved_globals))
+    }
+
+    fn commit_transaction(
+        &self,
+        env: &ContractEnv,
+        sender_balance: f64,
+        instance_balance: f64,
+    ) -> Result<(), RuntimeError> {
+        let mut storage = env.instance.storage.lock();
+        storage.set(
+            env.sender,
+            "balance",
+            Value::Number(sender_balance - env.value as f64),
+        );
+        storage.set(
+            env.instance.address,
+            "balance",
+            Value::Number(instance_balance + env.value as f64),
+        );
+        Ok(())
+    }
+
     pub fn call_contract_method(
         &mut self,
         method_name: &str,
         args: Vec<Value>,
         env: ContractEnv,
     ) -> Result<Value, RuntimeError> {
-        // TODO: get caller balance and check that env.value is less than this
-        // withdraw the value from caller
-        // increment this.balance with value
-        // rollback if fail
-        let saved_globals = std::mem::take(&mut self.globals);
-        let mut injected_globals = saved_globals.clone();
+        let (sender_balance, instance_balance, saved_globals) = self.prepare_transaction(&env)?;
 
-        inject_builtins_variables(&mut injected_globals, &env);
-        self.globals = injected_globals;
+        self.inject_env(&env, sender_balance);
 
         let method = env
             .instance
@@ -148,8 +205,10 @@ impl VM {
             method,
             Value::ContractInstance(env.instance.clone()),
             args,
-            Some(env),
+            Some(env.clone()),
         )?;
+
+        self.commit_transaction(&env, sender_balance, instance_balance)?;
 
         self.globals = saved_globals;
 
@@ -179,39 +238,6 @@ impl VM {
 
         Ok(result)
     }
-
-    /*
-    fn run_transaction(
-        &mut self,
-        caller: Address,
-        instance: &mut ContractInstance,
-        method_name: &str,
-        args: Vec<Value>,
-    ) -> Result<Value, RuntimeError> {
-        self.globals
-            .insert("caller".to_string(), Value::String(caller.to_string()));
-        /* TODO:
-                self.globals
-                    .insert("msg_value".to_string(), Value::String());
-                self.globals
-                    .insert("block_number".to_string(), Value::String());
-                self.globals
-                    .insert("gas_left".to_string(), Value::String());
-
-        */
-
-        let method = instance
-            .get_method(method_name)
-            .ok_or(RuntimeError::UndefinedVariable(method_name.to_string()))?;
-
-        self.call_method(
-            method,
-            Value::ContractInstance(instance.clone()),
-            args,
-            Some(instance.clone()),
-        )
-    }
-    */
 
     pub fn push(&mut self, value: Value) {
         self.stack.push(value)
@@ -606,9 +632,13 @@ fn trace(ip: usize, opcode: &Opcode, stack: &[Value]) {
     trace!("[{}] {:<25} | Stack: [{}]", ip_str, op_str, stack_str);
 }
 
-fn inject_builtins_variables(injected: &mut HashMap<String, Value>, env: &ContractEnv) {
+fn inject_builtins_variables(
+    injected: &mut HashMap<String, Value>,
+    env: &ContractEnv,
+    sender_balance: f64,
+) {
     injected.insert("msg.sender".into(), Value::Number(env.sender as f64));
-    injected.insert("msg.balance".into(), Value::Number(env.balance as f64));
+    injected.insert("msg.balance".into(), Value::Number(sender_balance));
     injected.insert("msg.value".into(), Value::Number(env.value as f64));
     injected.insert(
         "block.number".into(),

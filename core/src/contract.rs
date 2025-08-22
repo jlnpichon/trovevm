@@ -6,6 +6,12 @@ use sha2::{Digest, Sha256};
 
 use crate::{address::Address, function::CompiledFunction, storage::SharedStorage, value::Value};
 
+#[derive(Debug, Clone)]
+pub enum ContractOrInstance {
+    Contract(CompiledContract),
+    Instance(ContractInstance),
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompiledContract {
     pub name: String,
@@ -36,7 +42,6 @@ pub struct ContractEnv {
     pub value: u64,
     pub block_number: u64,
     pub timestamp: u64,
-    pub balance: u64,
 }
 
 impl ContractInstance {

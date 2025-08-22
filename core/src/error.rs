@@ -36,4 +36,20 @@ pub enum RuntimeError {
     NoContractInstance,
     #[error("Field '{0}' is read only")]
     ReadOnlyField(String),
+    #[error("Insufficient funds for transaction")]
+    InsufficientFunds,
+    #[error("Contract error: {0}")]
+    ContractError(String),
+    #[error("Wrong number of arguments for '{name}': expected {expected}, got {got}")]
+    ArityMismatch {
+        expected: usize,
+        got: usize,
+        name: &'static str,
+    },
+    #[error("Type mismatch for '{name}': expected {expected}, got {got}")]
+    TypeMismatch {
+        expected: &'static str,
+        got: &'static str,
+        name: &'static str,
+    },
 }
