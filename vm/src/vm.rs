@@ -74,16 +74,7 @@ impl VM {
             timestamp: 0,
         };
 
-        if let Some(init_method) = instance.get_method("init") {
-            /*
-            self.call_method(
-                init_method,
-                Value::ContractInstance(instance.clone()),
-                args,
-                Some(env),
-            )?;
-            */
-
+        if instance.get_method("init").is_some() {
             self.call_contract_method("init", args, env)?;
         }
 
@@ -221,13 +212,15 @@ impl VM {
             Value::ContractInstance(env.instance.clone()),
             args,
             Some(env.clone()),
-        )?;
+        );
 
-        self.commit_transaction(&env, sender_balance, instance_balance)?;
+        if result.is_ok() {
+            self.commit_transaction(&env, sender_balance, instance_balance)?;
+        }
 
         self.globals = saved_globals;
 
-        Ok(result)
+        result
     }
 
     fn call_method(

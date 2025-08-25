@@ -16,7 +16,7 @@ fn compile_contract(source: &str, contract_name: &str) -> CompiledContract {
     compiled_program
         .contracts
         .get(contract_name)
-        .expect("get 'Counter' compiled contract failed")
+        .unwrap_or_else(|| panic!("get '{contract_name}' compiled contract failed"))
         .clone()
 }
 
@@ -298,4 +298,61 @@ fn token_map_test() {
         .expect("get_balance failed");
 
     pretty_assertions::assert_eq!(alice_balance, Value::Number(90.0));
+}
+
+#[test]
+fn test_transaction_failure_does_not_change_balances() {
+    let source = r#"
+    contract FailContract {
+        fn fail_method() {
+            error("Fail");
+        }
+    }
+    "#;
+
+    let compiled_contract = compile_contract(source, "FailContract");
+
+    let bob = 42;
+
+    let mut world_state = WorldState::default();
+
+    // Init sender balance
+    world_state
+        .storage
+        .lock()
+        .set(bob, "balance", Value::Number(1000.0));
+
+    let mut vm = VM::new();
+    let instance = vm
+        .deploy(bob, compiled_contract, vec![], &mut world_state)
+        .expect("deploy failed");
+
+    // Init contract balance
+    world_state
+        .storage
+        .lock()
+        .set(instance.address, "balance", Value::Number(50.0));
+
+    let env_owner = ContractEnv {
+        sender: bob,
+        self_address: instance.address,
+        instance: instance.clone(),
+        value: 200,
+        block_number: 0,
+        timestamp: 0,
+    };
+
+    let result = vm.call_contract_method("fail_method", vec![], env_owner.clone());
+
+    assert!(
+        matches!(result, Err(RuntimeError::ContractError(_))),
+        "Expected call to fail with ContractError"
+    );
+
+    let storage = instance.storage.lock();
+    let sender_balance = storage.get(env_owner.sender, "balance").unwrap();
+    let contract_balance = storage.get(env_owner.instance.address, "balance").unwrap();
+
+    assert_eq!(sender_balance, Value::Number(1000.0));
+    assert_eq!(contract_balance, Value::Number(50.0));
 }
