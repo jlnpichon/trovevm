@@ -112,56 +112,95 @@ impl VisitorMut for DesugarBuiltins {
     }
 
     fn visit_expr_mut(&mut self, e: &mut Expr) -> Result<(), CompileError> {
-        if let Expr::Get { object, name } = e {
-            if let Expr::Variable(obj) = object.as_mut() {
-                let new_expr = match obj.as_str() {
-                    "msg" => match name.as_str() {
-                        "sender" => Some(Expr::BuiltinVariable(BuiltinVariableKind::MsgSender)),
-                        "value" => Some(Expr::BuiltinVariable(BuiltinVariableKind::MsgValue)),
-                        "data" => Some(Expr::BuiltinVariable(BuiltinVariableKind::MsgData)),
-                        "balance" => Some(Expr::BuiltinVariable(BuiltinVariableKind::MsgBalance)),
-                        _ => {
-                            return Err(CompileError::InvalidFieldAccess(
-                                "msg".to_string(),
-                                name.to_string(),
-                            ));
-                        }
-                    },
-                    "block" => match name.as_str() {
-                        "number" => Some(Expr::BuiltinVariable(BuiltinVariableKind::BlockNumber)),
-                        "timestamp" => {
-                            Some(Expr::BuiltinVariable(BuiltinVariableKind::BlockTimestamp))
-                        }
-                        "hash" => Some(Expr::BuiltinVariable(BuiltinVariableKind::BlockHash)),
-                        "gas_limit" => {
-                            Some(Expr::BuiltinVariable(BuiltinVariableKind::BlockGasLimit))
-                        }
-                        "coinbase" => {
-                            Some(Expr::BuiltinVariable(BuiltinVariableKind::BlockCoinbase))
-                        }
-                        _ => {
-                            return Err(CompileError::InvalidFieldAccess(
-                                "block".to_string(),
-                                name.to_string(),
-                            ));
-                        }
-                    },
-                    _ => match name.as_str() {
-                        "balance" => Some(Expr::BuiltinVariable(BuiltinVariableKind::Balance(
-                            object.clone(),
-                        ))),
-                        _ => None,
-                    },
-                };
+        match e {
+            Expr::Get { object, name } => {
+                if let Expr::Variable(obj) = object.as_mut() {
+                    let new_expr = match obj.as_str() {
+                        "msg" => match name.as_str() {
+                            "sender" => Some(Expr::BuiltinVariable(BuiltinVariableKind::MsgSender)),
+                            "value" => Some(Expr::BuiltinVariable(BuiltinVariableKind::MsgValue)),
+                            "data" => Some(Expr::BuiltinVariable(BuiltinVariableKind::MsgData)),
+                            "balance" => {
+                                Some(Expr::BuiltinVariable(BuiltinVariableKind::MsgBalance))
+                            }
+                            _ => {
+                                return Err(CompileError::InvalidFieldAccess(
+                                    "msg".to_string(),
+                                    name.to_string(),
+                                ));
+                            }
+                        },
+                        "block" => match name.as_str() {
+                            "number" => {
+                                Some(Expr::BuiltinVariable(BuiltinVariableKind::BlockNumber))
+                            }
+                            "timestamp" => {
+                                Some(Expr::BuiltinVariable(BuiltinVariableKind::BlockTimestamp))
+                            }
+                            "hash" => Some(Expr::BuiltinVariable(BuiltinVariableKind::BlockHash)),
+                            "gas_limit" => {
+                                Some(Expr::BuiltinVariable(BuiltinVariableKind::BlockGasLimit))
+                            }
+                            "coinbase" => {
+                                Some(Expr::BuiltinVariable(BuiltinVariableKind::BlockCoinbase))
+                            }
+                            _ => {
+                                return Err(CompileError::InvalidFieldAccess(
+                                    "block".to_string(),
+                                    name.to_string(),
+                                ));
+                            }
+                        },
+                        _ => match name.as_str() {
+                            "balance" => Some(Expr::BuiltinVariable(BuiltinVariableKind::Balance(
+                                object.clone(),
+                            ))),
+                            _ => None,
+                        },
+                    };
 
-                if let Some(expr) = new_expr {
-                    *e = expr;
-                }
-            } else if let Expr::Literal(Literal::Number(_)) = object.as_mut() {
-                if name.as_str() == "balance" {
-                    *e = Expr::BuiltinVariable(BuiltinVariableKind::Balance(object.clone()));
+                    if let Some(expr) = new_expr {
+                        *e = expr;
+                    }
+                } else if let Expr::Literal(Literal::Number(_)) = object.as_mut() {
+                    if name.as_str() == "balance" {
+                        *e = Expr::BuiltinVariable(BuiltinVariableKind::Balance(object.clone()));
+                    }
                 }
             }
+            Expr::Set { object, value, .. } => {
+                object.accept_mut(self)?;
+                value.accept_mut(self)?;
+            }
+            Expr::IndexGet { object, index } => {
+                object.accept_mut(self)?;
+                index.accept_mut(self)?;
+            }
+            Expr::IndexSet {
+                object,
+                index,
+                value,
+            } => {
+                object.accept_mut(self)?;
+                index.accept_mut(self)?;
+                value.accept_mut(self)?;
+            }
+            Expr::Assign { target, value } => {
+                target.accept_mut(self)?;
+                value.accept_mut(self)?;
+            }
+            Expr::FnCall { callee, args } => {
+                callee.accept_mut(self)?;
+                for arg in args {
+                    arg.accept_mut(self)?;
+                }
+            }
+            Expr::Unary { expr, .. } => expr.accept_mut(self)?,
+            Expr::Binary { lhs, rhs, .. } => {
+                lhs.accept_mut(self)?;
+                rhs.accept_mut(self)?;
+            }
+            _ => (),
         };
 
         Ok(())

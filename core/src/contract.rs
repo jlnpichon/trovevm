@@ -32,6 +32,7 @@ pub struct ContractInstance {
     #[serde(skip)]
     pub storage: SharedStorage,
     pub address: Address,
+    pub owner: Address,
 }
 
 #[derive(Debug, Clone)]
@@ -45,11 +46,17 @@ pub struct ContractEnv {
 }
 
 impl ContractInstance {
-    pub fn new(address: Address, contract: CompiledContract, storage: SharedStorage) -> Self {
+    pub fn new(
+        address: Address,
+        owner: Address,
+        contract: CompiledContract,
+        storage: SharedStorage,
+    ) -> Self {
         Self {
             contract,
             storage,
             address,
+            owner,
         }
     }
 

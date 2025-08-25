@@ -1,3 +1,6 @@
+use jsonrpsee::tracing::Level;
+use tracing_error::ErrorLayer;
+use tracing_subscriber::{EnvFilter, fmt};
 use trove_core::{
     ContractEnv, RuntimeError, Value, WorldState,
     contract::{CompiledContract, ContractOrInstance},
@@ -153,68 +156,77 @@ fn test_balance() {
 }
 
 #[test]
-fn token_minimal_test() {
+fn token_map_test() {
     let source = r#"
     contract MyToken {
-        let balance_owner;
-        let balance_alice;
-        let total_supply;
+        let balances;
 
         fn init() {
-            this.total_supply = 1000;
-            this.balance_owner = 1000;
-            this.balance_alice = 0;
+            this.balances = map();
+            this.balances[owner] = 1000;
         }
 
-        fn transfer_to_alice(amount) {
-            if (this.balance_owner < amount) {
-                error("Insufficient balance");
+        fn transfer_to(from, to, amount) {
+            let from_balance = this.balances[from];
+            if (from_balance < amount) {
+                error("Insufficient funds");
             }
-            this.balance_owner = this.balance_owner - amount;
-            this.balance_alice = this.balance_alice + amount;
+
+            this.balances[from] = from_balance - amount;
+            let to_balance = this.balances[to];
+            this.balances[to] = to_balance + amount;
         }
 
-        fn mint_owner(amount) {
-            this.total_supply = this.total_supply + amount;
-            this.balance_owner = this.balance_owner + amount;
-        }
-
-        fn burn_owner(amount) {
-            if (this.balance_owner < amount) {
-                error("Insufficient balance");
+        fn mint(to,  amount) {
+            if (msg.sender != owner) {
+                error("Only owner can mint");
             }
-            this.balance_owner = this.balance_owner - amount;
-            this.total_supply = this.total_supply - amount;
+
+            let current = this.balances[to];
+            this.balances[to] = current + amount;
+            return amount;
         }
 
-        fn get_owner_balance() {
-            return this.balance_owner;
+        fn burn(who, amount) {
+            if (msg.sender != owner) {
+                error("Only owner can mint");
+            }
+
+            let balance = this.balances[who];
+            if (balance < amount) {
+                error("Not enough funds for burning");
+            }
+
+            this.balances[who] = balance - amount;
+            return amount;
         }
 
-        fn get_alice_balance() {
-            return this.balance_alice;
+        fn get_balance(user) {
+            return this.balances[user];
         }
     }
     "#;
 
     let compiled_contract = compile_contract(source, "MyToken");
 
-    let mut world_state = WorldState::default();
-    let mut vm = VM::new();
-    let instance = vm
-        .deploy(0, compiled_contract, vec![], &mut world_state)
-        .expect("deploy failed");
+    let bob = 42;
+    let alice = 84;
 
-    let sender_address = 42;
+    let mut world_state = WorldState::default();
 
     // Init sender balance
     world_state
         .storage
         .lock()
-        .set(sender_address, "balance", Value::Number(1000.0));
+        .set(bob, "balance", Value::Number(1000.0));
+
+    let mut vm = VM::new();
+    let instance = vm
+        .deploy(bob, compiled_contract, vec![], &mut world_state)
+        .expect("deploy failed");
 
     let env_owner = ContractEnv {
-        sender: sender_address,
+        sender: bob,
         self_address: instance.address,
         instance: instance.clone(),
         value: 0,
@@ -222,42 +234,68 @@ fn token_minimal_test() {
         timestamp: 0,
     };
 
-    // Transfert 100 from owner to Alice
+    // Transfer 100 from Bob to Alice
     vm.call_contract_method(
-        "transfer_to_alice",
-        vec![Value::Number(100.0)],
+        "transfer_to",
+        vec![
+            Value::Number(bob as f64),
+            Value::Number(alice as f64),
+            Value::Number(100.0),
+        ],
         env_owner.clone(),
     )
     .expect("transfer failed");
 
     // Check balances
     let owner_balance = vm
-        .call_contract_method("get_owner_balance", vec![], env_owner.clone())
-        .expect("get_owner_balance failed");
+        .call_contract_method(
+            "get_balance",
+            vec![Value::Number(bob as f64)],
+            env_owner.clone(),
+        )
+        .expect("get_balance failed");
     let alice_balance = vm
-        .call_contract_method("get_alice_balance", vec![], env_owner.clone())
-        .expect("get_alice_balance failed");
+        .call_contract_method(
+            "get_balance",
+            vec![Value::Number(alice as f64)],
+            env_owner.clone(),
+        )
+        .expect("get_balance failed");
 
     pretty_assertions::assert_eq!(owner_balance, Value::Number(900.0));
     pretty_assertions::assert_eq!(alice_balance, Value::Number(100.0));
 
     // Mint 50 for owner
-    vm.call_contract_method("mint_owner", vec![Value::Number(50.0)], env_owner.clone())
-        .expect("mint failed");
+    vm.call_contract_method(
+        "mint",
+        vec![Value::Number(bob as f64), Value::Number(50.0)],
+        env_owner.clone(),
+    )
+    .expect("mint failed");
 
+    // Check owner balacne
     let owner_balance = vm
-        .call_contract_method("get_owner_balance", vec![], env_owner.clone())
-        .expect("get_owner_balance failed");
+        .call_contract_method(
+            "get_balance",
+            vec![Value::Number(bob as f64)],
+            env_owner.clone(),
+        )
+        .expect("get_balance failed");
 
     pretty_assertions::assert_eq!(owner_balance, Value::Number(950.0));
 
-    // Burn 200 of owner
-    vm.call_contract_method("burn_owner", vec![Value::Number(200.0)], env_owner.clone())
-        .expect("burn failed");
+    // Burn 10 of Alice
+    vm.call_contract_method(
+        "burn",
+        vec![Value::Number(alice as f64), Value::Number(10.0)],
+        env_owner.clone(),
+    )
+    .expect("burn failed");
 
-    let owner_balance = vm
-        .call_contract_method("get_owner_balance", vec![], env_owner)
-        .expect("get_owner_balance failed");
+    // Check Alice balance
+    let alice_balance = vm
+        .call_contract_method("get_balance", vec![Value::Number(alice as f64)], env_owner)
+        .expect("get_balance failed");
 
-    pretty_assertions::assert_eq!(owner_balance, Value::Number(750.0));
+    pretty_assertions::assert_eq!(alice_balance, Value::Number(90.0));
 }

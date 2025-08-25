@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt};
 use serde::{Deserialize, Serialize};
 
 use super::{contract::ContractInstance, function::CompiledFunction};
-use crate::error::RuntimeError;
+use crate::{Address, error::RuntimeError};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]
@@ -14,7 +14,15 @@ pub enum Value {
     Null,
     Function(CompiledFunction),
     ContractInstance(ContractInstance),
-    Map(HashMap<String, Value>),
+    Map(Map),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Map {
+    pub address: Option<Address>,
+    pub name: Option<String>,
+    pub from_storage: bool,
+    pub entries: HashMap<String, Value>,
 }
 
 #[derive(Debug, Clone)]
@@ -106,7 +114,7 @@ impl Value {
             Value::Bool(b) => *b,
             Value::Function(_) => true,
             Value::ContractInstance(_) => true,
-            Value::Map(_) => true,
+            Value::Map { .. } => true,
             Value::Null => false,
         }
     }
@@ -139,14 +147,29 @@ impl Value {
         }
     }
 
+    /*
     pub fn as_map(&self) -> Option<&HashMap<String, Value>> {
+        match self {
+            Value::Map { .. } => Some(self),
+            _ => None,
+        }
+    }
+
+    pub fn as_map_mut(&mut self) -> Option<&mut HashMap<String, Value>> {
+        match self {
+            Value::Map(m) => Some(m),
+            _ => None,
+        }
+    }
+    */
+    pub fn as_map(&self) -> Option<&Map> {
         match self {
             Value::Map(m) => Some(m),
             _ => None,
         }
     }
 
-    pub fn as_map_mut(&mut self) -> Option<&mut HashMap<String, Value>> {
+    pub fn as_map_mut(&mut self) -> Option<&mut Map> {
         match self {
             Value::Map(m) => Some(m),
             _ => None,
@@ -221,7 +244,7 @@ impl fmt::Display for Value {
             Value::String(s) => write!(f, "{s}"),
             Value::Bool(b) => write!(f, "{b}"),
             Value::Null => write!(f, "Null"),
-            Value::Map(map) => write!(f, "{map:?}"),
+            Value::Map(map) => write!(f, "{:?}", map.entries),
             Value::Function(function) => {
                 write!(
                     f,

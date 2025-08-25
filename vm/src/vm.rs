@@ -58,8 +58,12 @@ impl VM {
             .lock()
             .init_instance(sender, address, &contract);
 
-        let instance =
-            ContractInstance::new(address, contract.clone(), world_state.storage.clone());
+        let instance = ContractInstance::new(
+            address,
+            sender,
+            contract.clone(),
+            world_state.storage.clone(),
+        );
 
         let env = ContractEnv {
             sender: 0,
@@ -71,12 +75,16 @@ impl VM {
         };
 
         if let Some(init_method) = instance.get_method("init") {
+            /*
             self.call_method(
                 init_method,
                 Value::ContractInstance(instance.clone()),
                 args,
                 Some(env),
             )?;
+            */
+
+            self.call_contract_method("init", args, env)?;
         }
 
         world_state
@@ -98,7 +106,10 @@ impl VM {
         let (instance, do_init) = match target {
             ContractOrInstance::Contract(contract) => {
                 let storage = contract.default_storage();
-                (ContractInstance::new(0, contract, storage), true)
+                (
+                    ContractInstance::new(0, sender.unwrap_or(0), contract, storage),
+                    true,
+                )
             }
             ContractOrInstance::Instance(instance) => (instance, false),
         };
@@ -332,7 +343,7 @@ impl VM {
     fn call(
         &mut self,
         function: CompiledFunction,
-        args: usize,
+        args_count: usize,
         env: Option<ContractEnv>,
     ) -> Result<(), RuntimeError> {
         match function.kind {
@@ -340,7 +351,7 @@ impl VM {
                 self.frames.push(CallFrame {
                     function,
                     ip: 0,
-                    base: self.stack.len() - args - 1,
+                    base: self.stack.len() - args_count - 1,
                     env,
                 });
             }
@@ -350,8 +361,16 @@ impl VM {
                     .get(&name)
                     .ok_or(RuntimeError::UndefinedNative(name.to_string()))?
                     .clone();
-                let value = native.call(&[], self)?;
-                for _ in 0..args {
+
+                let mut args = vec![];
+                for offset in 0..args_count {
+                    let arg = self.stack_peek_from_top(offset)?;
+                    args.push(arg.clone());
+                }
+
+                let value = native.call(&args, self)?;
+
+                for _ in 0..args_count {
                     self.pop()?;
                 }
                 self.pop()?; // native function object
@@ -489,6 +508,7 @@ impl VM {
                         ))?
                         .clone();
 
+                    /*
                     let mut this = self
                         .stack_top()
                         .ok_or(RuntimeError::StackUnderflow)?
@@ -498,7 +518,8 @@ impl VM {
                             "'this' must be a contract instance".into(),
                         ))?
                         .clone();
-                    /*
+                    */
+
                     let mut this = self
                         .pop()?
                         .borrow_mut()
@@ -507,7 +528,6 @@ impl VM {
                             "'this' must be a contract instance".into(),
                         ))?
                         .clone();
-                    */
 
                     if !this.var_exists(&field_name) {
                         return Err(RuntimeError::UndefinedVariable(field_name.clone()));
@@ -516,6 +536,17 @@ impl VM {
                     let value = this
                         .get_field(&field_name)
                         .ok_or(RuntimeError::UndefinedVariable(field_name.clone()))?;
+
+                    let value = if let Value::Map(mut map) = value {
+                        map.from_storage = true;
+                        map.address = Some(this.address);
+                        map.name = Some(field_name.clone());
+                        Value::Map(map)
+                    } else {
+                        value
+                    };
+
+                    //println!("GetField this.{field_name}=>{value:?} {:p}", &value);
 
                     self.push(Rc::new(RefCell::new(value)));
                 }
@@ -547,7 +578,12 @@ impl VM {
                         return Err(RuntimeError::UndefinedVariable(field_name.clone()));
                     }
 
-                    this.set_field(&field_name, value.borrow().clone() /* Deep clone */);
+                    let value_clone = value.borrow().clone();
+                    //println!(
+                    //    "SetField this.{field_name}={value_clone:?} {:p}",
+                    //    &value_clone
+                    //);
+                    this.set_field(&field_name, value_clone /* Deep clone */);
                     self.push(value);
                 }
                 Opcode::IndexGet => {
@@ -562,8 +598,9 @@ impl VM {
                         .clone();
 
                     let value = map
+                        .entries
                         .get(&index.borrow().to_string())
-                        .unwrap_or(&Value::Null)
+                        .unwrap_or(&Value::Number(0.))
                         .clone();
 
                     self.push(Rc::new(RefCell::new(value)));
@@ -571,17 +608,39 @@ impl VM {
                 Opcode::IndexSet => {
                     let value = self.pop()?;
                     let index = self.pop()?;
-                    self.pop()?
-                        .borrow_mut()
-                        .as_map_mut()
-                        .ok_or(RuntimeError::TypeError(
-                            "Only map can be indexed".to_string(),
-                        ))?
-                        .insert(
-                            index.borrow().to_string(),
-                            value.borrow().clone(), /* Deep clone */
-                        );
+                    /*
+                                        self.pop()?
+                                            .borrow_mut()
+                                            .as_map_mut()
+                                            .ok_or(RuntimeError::TypeError(
+                                                "Only map can be indexed".to_string(),
+                                            ))?
+                                            .entries
+                                            .insert(
+                                                index.borrow().to_string(),
+                                                value.borrow().clone(), /* Deep clone */
+                                            );
+                    */
+                    let map_rc = self.pop()?;
+                    let mut map_ref_mut = map_rc.borrow_mut();
+                    let map_mut = map_ref_mut.as_map_mut().ok_or(RuntimeError::TypeError(
+                        "Only map can be indexed".to_string(),
+                    ))?;
+                    map_mut.entries.insert(
+                        index.borrow().to_string(),
+                        value.borrow().clone(), /* Deep clone */
+                    );
 
+                    if map_mut.from_storage {
+                        let frame = self.frames.last().unwrap();
+                        let instance = &frame.env.as_ref().unwrap().instance;
+                        instance.storage.lock().set(
+                            map_mut.address.unwrap(),
+                            map_mut.name.as_ref().unwrap(),
+                            Value::Map(map_mut.clone()),
+                        );
+                    }
+                    //println!("IndexSet map {map_mut:?} {index:?}={value:?}");
                     self.push(value);
                 }
 
@@ -721,5 +780,9 @@ fn inject_builtins_variables(
     injected.insert(
         "block.timestamp".into(),
         Rc::new(RefCell::new(Value::Number(env.timestamp as f64))),
+    );
+    injected.insert(
+        "owner".into(),
+        Rc::new(RefCell::new(Value::Number(env.instance.owner as f64))),
     );
 }

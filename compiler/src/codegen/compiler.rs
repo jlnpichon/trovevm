@@ -239,7 +239,6 @@ impl Visitor for Compiler {
             Statement::Return(expr) => {
                 if let Some(expr) = expr {
                     expr.accept(self);
-                    self.pop_locals();
                     self.emit_opcode(Opcode::Return);
                 } else {
                     self.pop_locals();
@@ -267,9 +266,9 @@ impl Visitor for Compiler {
 
                 let else_offset = self.current_opcode_index();
                 self.patch_jump(jump_to_else, else_offset - jump_to_else);
+                self.emit_opcode(Opcode::Pop); // Pop the condition
 
                 if let Some(else_branch) = &else_branch {
-                    self.emit_opcode(Opcode::Pop); // Pop the condition
                     else_branch.accept(self)
                 }
 
