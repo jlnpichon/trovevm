@@ -101,9 +101,9 @@ fn main() -> anyhow::Result<()> {
         WorldState::default()
     };
 
-    let listener = TcpListener::bind("127.0.0.1:4321")?;
+    let listener = TcpListener::bind("0.0.0.0:4321")?;
     let world_state = Rc::new(RefCell::new(world_state));
-    info!("Trove JSON-RPC node running on 127.0.0.1:4321");
+    info!("Trove JSON-RPC node running on 0.0.0.0:4321");
 
     for stream in listener.incoming() {
         match stream {

@@ -1,0 +1,9 @@
+services:
+  node:
+    build:
+      context: .
+      dockerfile: node/Dockerfile
+    ports:
+      - "4321:4321"
+    environment:
+      - RUST_LOG=info

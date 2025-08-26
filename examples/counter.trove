@@ -1,0 +1,15 @@
+contract Counter {
+  let counter;
+
+  fn init() {
+    counter = 0;
+  }
+
+  fn inc() {
+    this.counter = this.counter + 1;
+  }
+
+  fn get() {
+    return count;
+  }
+}

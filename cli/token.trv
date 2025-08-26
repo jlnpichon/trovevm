@@ -1,0 +1,40 @@
+contract MyToken {
+  let balance_owner;
+  let balance_alice;
+  let total_supply;
+
+  fn init() {
+    this.total_supply = 1000;
+    this.balance_owner = 1000;
+    this.balance_alice = 0;
+  }
+
+  fn transfer_to_alice(amount) {
+    if (this.balance_owner < amount) {
+      error("Insufficient balance");
+    }
+    this.balance_owner = this.balance_owner - amount;
+    this.balance_alice = this.balance_alice + amount;
+  }
+
+  fn mint_owner(amount) {
+    this.total_supply = this.total_supply + amount;
+    this.balance_owner = this.balance_owner + amount;
+  }
+
+  fn burn_owner(amount) {
+    if (this.balance_owner < amount) {
+      error("Insufficient balance");
+    }
+    this.balance_owner = this.balance_owner - amount;
+    this.total_supply = this.total_supply - amount;
+  }
+
+  fn get_owner_balance() {
+    return this.balance_owner;
+  }
+
+  fn get_alice_balance() {
+    return this.balance_alice;
+  }
+}

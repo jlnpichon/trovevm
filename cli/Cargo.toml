@@ -3,6 +3,10 @@ name = "trove-cli"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "trove-cli"
+path = "src/main.rs"
+
 [dependencies]
 trove-core = { path = "../core" }
 trovec = { path = "../compiler/" }
