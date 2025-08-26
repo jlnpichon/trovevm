@@ -1,8 +1,2 @@
 [workspace]
 members = ["core", "compiler", "node", "cli"]
-
-#[workspace.dependencies]
-#tokio = { version = "1.47.1", features = ["sync"], optional = true }
-
-[workspace.features]
-tokio-async = ["tokio", "core/tokio-async", "vm/tokio-async"]

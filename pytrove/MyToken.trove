@@ -1,0 +1,47 @@
+contract MyToken {
+    let balances;
+
+    fn init() {
+        this.balances = map();
+        this.balances[owner] = 1000;
+    }
+
+    fn transfer_to(from, to, amount) {
+        let from_balance = this.balances[from];
+        if (from_balance < amount) {
+            error("Insufficient funds");
+        }
+
+        this.balances[from] = from_balance - amount;
+        let to_balance = this.balances[to];
+        this.balances[to] = to_balance + amount;
+    }
+
+    fn mint(to, amount) {
+        if (msg.sender != owner) {
+            error("Only owner can mint");
+        }
+
+        let current = this.balances[to];
+        this.balances[to] = current + amount;
+        return amount;
+    }
+
+    fn burn(who, amount) {
+        if (msg.sender != owner) {
+            error("Only owner can burn");
+        }
+
+        let balance = this.balances[who];
+        if (balance < amount) {
+            error("Not enough funds for burning");
+        }
+
+        this.balances[who] = balance - amount;
+        return amount;
+    }
+
+    fn get_balance(user) {
+        return this.balances[user];
+    }
+}

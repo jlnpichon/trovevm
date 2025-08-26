@@ -3,7 +3,6 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc, time::SystemTime};
 use trove_core::{
     CompiledFunction, RuntimeError, Value,
     function::{Callable, CompiledFunctionKind, ExecContext},
-    value::Map,
 };
 
 pub type NativeFn = fn(&[Value], &mut dyn ExecContext) -> Result<Value, RuntimeError>;
@@ -87,10 +86,5 @@ fn error(args: &[Value], _: &mut dyn ExecContext) -> Result<Value, RuntimeError>
 }
 
 fn map(_: &[Value], _: &mut dyn ExecContext) -> Result<Value, RuntimeError> {
-    Ok(Value::Map(Map {
-        address: None,
-        name: None,
-        from_storage: false,
-        entries: HashMap::new(),
-    }))
+    Ok(Value::Map(HashMap::new()))
 }

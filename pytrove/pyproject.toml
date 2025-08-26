@@ -1,0 +1,11 @@
+[project]
+name = "pytrove"
+version = "0.1.0"
+description = "Python client for TroveVM RPC"
+authors = [{ name = "Julien Pichon" }]
+requires-python = ">=3.10"
+dependencies = ["websockets", "asyncio"]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"

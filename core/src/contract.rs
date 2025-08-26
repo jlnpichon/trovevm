@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use bincode::error::{DecodeError, EncodeError};
 use serde::{Deserialize, Serialize};
@@ -60,11 +60,11 @@ impl ContractInstance {
         }
     }
 
-    pub fn get_field(&mut self, key: &str) -> Option<Value> {
+    pub fn get_field(&mut self, key: &str) -> Option<Rc<RefCell<Value>>> {
         self.storage.lock().get(self.address, key)
     }
 
-    pub fn set_field(&mut self, key: &str, value: Value) {
+    pub fn set_field(&mut self, key: &str, value: Rc<RefCell<Value>>) {
         self.storage.lock().set(self.address, key, value)
     }
 
@@ -108,18 +108,5 @@ impl CompiledContract {
         let instance_address = 0;
         storage.lock().init_instance(0, instance_address, self);
         storage
-    }
-}
-
-impl ContractInstance {
-    fn into_bytes(&self) -> Result<Vec<u8>, EncodeError> {
-        bincode::serde::encode_to_vec(self, bincode::config::standard())
-    }
-
-    fn from_bytes(bytes: &[u8], storage: SharedStorage) -> Result<ContractInstance, DecodeError> {
-        let (mut instance, _): (ContractInstance, _) =
-            bincode::serde::decode_from_slice(bytes, bincode::config::standard())?;
-        instance.storage = storage;
-        Ok(instance)
     }
 }

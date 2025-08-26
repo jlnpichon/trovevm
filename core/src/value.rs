@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt};
 use serde::{Deserialize, Serialize};
 
 use super::{contract::ContractInstance, function::CompiledFunction};
-use crate::{Address, error::RuntimeError};
+use crate::{contract::CompiledContract, error::RuntimeError};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]
@@ -14,15 +14,8 @@ pub enum Value {
     Null,
     Function(CompiledFunction),
     ContractInstance(ContractInstance),
-    Map(Map),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Map {
-    pub address: Option<Address>,
-    pub name: Option<String>,
-    pub from_storage: bool,
-    pub entries: HashMap<String, Value>,
+    ContractDef(CompiledContract),
+    Map(HashMap<String, Value>),
 }
 
 #[derive(Debug, Clone)]
@@ -116,6 +109,7 @@ impl Value {
             Value::ContractInstance(_) => true,
             Value::Map { .. } => true,
             Value::Null => false,
+            Value::ContractDef(_) => unreachable!(),
         }
     }
 
@@ -147,29 +141,14 @@ impl Value {
         }
     }
 
-    /*
     pub fn as_map(&self) -> Option<&HashMap<String, Value>> {
         match self {
-            Value::Map { .. } => Some(self),
+            Value::Map(m) => Some(m),
             _ => None,
         }
     }
 
     pub fn as_map_mut(&mut self) -> Option<&mut HashMap<String, Value>> {
-        match self {
-            Value::Map(m) => Some(m),
-            _ => None,
-        }
-    }
-    */
-    pub fn as_map(&self) -> Option<&Map> {
-        match self {
-            Value::Map(m) => Some(m),
-            _ => None,
-        }
-    }
-
-    pub fn as_map_mut(&mut self) -> Option<&mut Map> {
         match self {
             Value::Map(m) => Some(m),
             _ => None,
@@ -199,6 +178,7 @@ impl Value {
             Value::Map(_) => "Map",
             Value::Function(_) => "Function",
             Value::ContractInstance(_) => "ContractInstance",
+            Value::ContractDef(_) => "ContractDef",
         }
     }
 }
@@ -244,7 +224,7 @@ impl fmt::Display for Value {
             Value::String(s) => write!(f, "{s}"),
             Value::Bool(b) => write!(f, "{b}"),
             Value::Null => write!(f, "Null"),
-            Value::Map(map) => write!(f, "{:?}", map.entries),
+            Value::Map(map) => write!(f, "{:?}", map),
             Value::Function(function) => {
                 write!(
                     f,
@@ -254,9 +234,12 @@ impl fmt::Display for Value {
             }
             Value::ContractInstance(instance) => write!(
                 f,
-                "<contract {}@{:?}>",
+                "<instance {}@{:?}>",
                 instance.contract.name, instance.address
             ),
+            Value::ContractDef(contract) => {
+                write!(f, "<contract {}>", contract.name)
+            }
         }
     }
 }

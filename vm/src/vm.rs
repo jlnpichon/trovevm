@@ -78,6 +78,12 @@ impl VM {
             self.call_contract_method("init", args, env)?;
         }
 
+        world_state.storage.lock().set(
+            instance.address,
+            "_instance",
+            Rc::new(RefCell::new(Value::ContractInstance(instance.clone()))),
+        );
+
         world_state
             .instances
             .insert(instance.address, instance.clone());
@@ -152,7 +158,8 @@ impl VM {
         let sender_balance = storage
             .lock()
             .get(env.sender, "balance")
-            .ok_or(RuntimeError::UndefinedVariable("sender.balance".into()))?
+            .unwrap_or(Rc::new(RefCell::new(Value::Number(0.0))))
+            .borrow()
             .as_number()
             .ok_or(RuntimeError::TypeError("balance must be a number".into()))?;
 
@@ -164,6 +171,7 @@ impl VM {
             .lock()
             .get(env.instance.address, "balance")
             .ok_or(RuntimeError::UndefinedVariable("instance.balance".into()))?
+            .borrow()
             .as_number()
             .ok_or(RuntimeError::TypeError("balance must be a number".into()))?;
 
@@ -182,12 +190,16 @@ impl VM {
         storage.set(
             env.sender,
             "balance",
-            Value::Number(sender_balance - env.value as f64),
+            Rc::new(RefCell::new(Value::Number(
+                sender_balance - env.value as f64,
+            ))),
         );
         storage.set(
             env.instance.address,
             "balance",
-            Value::Number(instance_balance + env.value as f64),
+            Rc::new(RefCell::new(Value::Number(
+                instance_balance + env.value as f64,
+            ))),
         );
         Ok(())
     }
@@ -501,18 +513,6 @@ impl VM {
                         ))?
                         .clone();
 
-                    /*
-                    let mut this = self
-                        .stack_top()
-                        .ok_or(RuntimeError::StackUnderflow)?
-                        .borrow()
-                        .as_instance()
-                        .ok_or(RuntimeError::TypeError(
-                            "'this' must be a contract instance".into(),
-                        ))?
-                        .clone();
-                    */
-
                     let mut this = self
                         .pop()?
                         .borrow_mut()
@@ -530,18 +530,7 @@ impl VM {
                         .get_field(&field_name)
                         .ok_or(RuntimeError::UndefinedVariable(field_name.clone()))?;
 
-                    let value = if let Value::Map(mut map) = value {
-                        map.from_storage = true;
-                        map.address = Some(this.address);
-                        map.name = Some(field_name.clone());
-                        Value::Map(map)
-                    } else {
-                        value
-                    };
-
-                    //println!("GetField this.{field_name}=>{value:?} {:p}", &value);
-
-                    self.push(Rc::new(RefCell::new(value)));
+                    self.push(value);
                 }
                 Opcode::SetField(index) => {
                     let field_name = self
@@ -571,12 +560,8 @@ impl VM {
                         return Err(RuntimeError::UndefinedVariable(field_name.clone()));
                     }
 
-                    let value_clone = value.borrow().clone();
-                    //println!(
-                    //    "SetField this.{field_name}={value_clone:?} {:p}",
-                    //    &value_clone
-                    //);
-                    this.set_field(&field_name, value_clone /* Deep clone */);
+                    this.set_field(&field_name, value.clone());
+
                     self.push(value);
                 }
                 Opcode::IndexGet => {
@@ -591,7 +576,6 @@ impl VM {
                         .clone();
 
                     let value = map
-                        .entries
                         .get(&index.borrow().to_string())
                         .unwrap_or(&Value::Number(0.))
                         .clone();
@@ -601,39 +585,16 @@ impl VM {
                 Opcode::IndexSet => {
                     let value = self.pop()?;
                     let index = self.pop()?;
-                    /*
-                                        self.pop()?
-                                            .borrow_mut()
-                                            .as_map_mut()
-                                            .ok_or(RuntimeError::TypeError(
-                                                "Only map can be indexed".to_string(),
-                                            ))?
-                                            .entries
-                                            .insert(
-                                                index.borrow().to_string(),
-                                                value.borrow().clone(), /* Deep clone */
-                                            );
-                    */
-                    let map_rc = self.pop()?;
-                    let mut map_ref_mut = map_rc.borrow_mut();
-                    let map_mut = map_ref_mut.as_map_mut().ok_or(RuntimeError::TypeError(
-                        "Only map can be indexed".to_string(),
-                    ))?;
-                    map_mut.entries.insert(
-                        index.borrow().to_string(),
-                        value.borrow().clone(), /* Deep clone */
-                    );
-
-                    if map_mut.from_storage {
-                        let frame = self.frames.last().unwrap();
-                        let instance = &frame.env.as_ref().unwrap().instance;
-                        instance.storage.lock().set(
-                            map_mut.address.unwrap(),
-                            map_mut.name.as_ref().unwrap(),
-                            Value::Map(map_mut.clone()),
+                    self.pop()?
+                        .borrow_mut()
+                        .as_map_mut()
+                        .ok_or(RuntimeError::TypeError(
+                            "Only map can be indexed".to_string(),
+                        ))?
+                        .insert(
+                            index.borrow().to_string(),
+                            value.borrow().clone(), /* Deep clone */
                         );
-                    }
-                    //println!("IndexSet map {map_mut:?} {index:?}={value:?}");
                     self.push(value);
                 }
 
@@ -666,8 +627,8 @@ impl VM {
                         .storage
                         .lock()
                         .get(addr as Address, "balance")
-                        .unwrap_or(Value::Null);
-                    self.push(Rc::new(RefCell::new(balance)));
+                        .unwrap_or(Rc::new(RefCell::new(Value::Null)));
+                    self.push(balance);
                 }
 
                 Opcode::Jump(offset) => {
