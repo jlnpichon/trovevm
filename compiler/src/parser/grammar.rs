@@ -41,10 +41,10 @@ pub fn accept_rule<'i>(
     pairs: &mut pest::iterators::Pairs<'i, Rule>,
     expected: Rule,
 ) -> Option<pest::iterators::Pair<'i, Rule>> {
-    if let Some(peek) = pairs.peek() {
-        if peek.as_rule() == expected {
-            return pairs.next();
-        }
+    if let Some(peek) = pairs.peek()
+        && peek.as_rule() == expected
+    {
+        return pairs.next();
     }
     None
 }

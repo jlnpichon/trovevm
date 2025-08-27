@@ -111,7 +111,7 @@ fn run_compiler(statements: &mut [Statement], bytecode: &[Opcode], constants: &[
 #[test]
 fn test_compile_literal() {
     // 42.0;
-    let mut statement = make_stmt_expr(make_number_expr(42.0));
+    let statement = make_stmt_expr(make_number_expr(42.0));
     run_compiler(
         &mut [statement],
         &[Opcode::Push(0), Opcode::Pop, Opcode::Return],
@@ -119,7 +119,7 @@ fn test_compile_literal() {
     );
 
     // "a string";
-    let mut statement = make_stmt_expr(make_string_expr("a string"));
+    let statement = make_stmt_expr(make_string_expr("a string"));
     run_compiler(
         &mut [statement],
         &[Opcode::Push(0), Opcode::Pop, Opcode::Return],
@@ -344,7 +344,7 @@ fn test_for() {
 
     run_compiler(
         statements,
-        &mut [
+        &[
             // initializer
             Opcode::Push(0),
             //

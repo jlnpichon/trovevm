@@ -1,4 +1,9 @@
-use std::{collections::HashMap, fmt};
+use std::{
+    cell::{Ref, RefCell, RefMut},
+    collections::HashMap,
+    fmt,
+    rc::Rc,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -17,6 +22,9 @@ pub enum Value {
     ContractDef(CompiledContract),
     Map(HashMap<String, Value>),
 }
+
+#[derive(Debug, Clone)]
+pub struct SharedValue(pub Rc<RefCell<Value>>);
 
 #[derive(Debug, Clone)]
 pub enum Op {
@@ -183,6 +191,44 @@ impl Value {
     }
 }
 
+impl SharedValue {
+    pub fn new(value: Value) -> Self {
+        SharedValue(Rc::new(RefCell::new(value)))
+    }
+
+    pub fn from_null() -> Self {
+        SharedValue::new(Value::Null)
+    }
+
+    pub fn from_number(n: f64) -> Self {
+        SharedValue::new(Value::Number(n))
+    }
+
+    pub fn from_contract(contract: CompiledContract) -> Self {
+        SharedValue::new(Value::ContractDef(contract))
+    }
+
+    pub fn from_contract_instance(instance: ContractInstance) -> Self {
+        SharedValue::new(Value::ContractInstance(instance))
+    }
+
+    pub fn from_value(value: Value) -> Self {
+        SharedValue::new(value)
+    }
+
+    pub fn from_function(function: CompiledFunction) -> Self {
+        SharedValue::new(Value::Function(function))
+    }
+
+    pub fn borrow(&self) -> Ref<'_, Value> {
+        self.0.borrow()
+    }
+
+    pub fn borrow_mut(&mut self) -> RefMut<'_, Value> {
+        self.0.borrow_mut()
+    }
+}
+
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -192,6 +238,12 @@ impl PartialEq for Value {
             (Value::Null, Value::Null) => true,
             _ => false,
         }
+    }
+}
+
+impl PartialEq for SharedValue {
+    fn eq(&self, other: &Self) -> bool {
+        *self.0.borrow() == *other.0.borrow()
     }
 }
 

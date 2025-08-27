@@ -27,8 +27,6 @@ pub struct DeployContractResponse {
 pub struct DefineContractRequest {
     pub source_code: String,
     pub contract_name: String,
-    #[serde(deserialize_with = "deserialize_address")]
-    pub sender: Address,
 }
 
 #[derive(Debug, serde::Serialize, Clone)]

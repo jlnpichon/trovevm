@@ -1,8 +1,4 @@
-use std::{
-    cell::{Ref, RefCell},
-    collections::HashMap,
-    rc::Rc,
-};
+use std::{cell::Ref, collections::HashMap};
 
 use tracing::trace;
 
@@ -11,15 +7,15 @@ use trove_core::{
     WorldState,
     contract::{CompiledContract, ContractOrInstance, is_builtin_var},
     function::{Callable, CompiledFunctionKind, ExecContext},
-    value::Op,
+    value::{Op, SharedValue},
 };
 
 use crate::{function::CallFrame, native::install_natives};
 
 #[derive(Debug)]
 pub struct VM {
-    stack: Vec<Rc<RefCell<Value>>>, // TODO: limit
-    globals: HashMap<String, Rc<RefCell<Value>>>,
+    stack: Vec<SharedValue>, // TODO: limit
+    globals: HashMap<String, SharedValue>,
     natives: HashMap<String, Box<dyn Callable>>,
     frames: Vec<CallFrame>, // TODO: limit
 }
@@ -81,7 +77,7 @@ impl VM {
         world_state.storage.lock().set(
             instance.address,
             "_instance",
-            Rc::new(RefCell::new(Value::ContractInstance(instance.clone()))),
+            SharedValue::from_contract_instance(instance.clone()),
         );
 
         world_state
@@ -124,16 +120,14 @@ impl VM {
             timestamp: 0,
         };
 
-        if do_init {
-            if let Some(init_method) = instance.get_method("init") {
-                let args = init_args.unwrap_or_default();
-                self.call_method(
-                    init_method,
-                    Value::ContractInstance(instance.clone()),
-                    args,
-                    Some(env.clone()),
-                )?;
-            }
+        if do_init && let Some(init_method) = instance.get_method("init") {
+            let args = init_args.unwrap_or_default();
+            self.call_method(
+                init_method,
+                Value::ContractInstance(instance.clone()),
+                args,
+                Some(env.clone()),
+            )?;
         }
 
         self.call_method(
@@ -153,12 +147,12 @@ impl VM {
     fn prepare_transaction(
         &self,
         env: &ContractEnv,
-    ) -> Result<(f64, f64, HashMap<String, Rc<RefCell<Value>>>), RuntimeError> {
+    ) -> Result<(f64, f64, HashMap<String, SharedValue>), RuntimeError> {
         let storage = env.instance.storage.clone(); // Arc::clone
         let sender_balance = storage
             .lock()
             .get(env.sender, "balance")
-            .unwrap_or(Rc::new(RefCell::new(Value::Number(0.0))))
+            .unwrap_or(SharedValue::from_number(0.))
             .borrow()
             .as_number()
             .ok_or(RuntimeError::TypeError("balance must be a number".into()))?;
@@ -190,16 +184,12 @@ impl VM {
         storage.set(
             env.sender,
             "balance",
-            Rc::new(RefCell::new(Value::Number(
-                sender_balance - env.value as f64,
-            ))),
+            SharedValue::from_number(sender_balance - env.value as f64),
         );
         storage.set(
             env.instance.address,
             "balance",
-            Rc::new(RefCell::new(Value::Number(
-                instance_balance + env.value as f64,
-            ))),
+            SharedValue::from_number(instance_balance + env.value as f64),
         );
         Ok(())
     }
@@ -243,12 +233,12 @@ impl VM {
         env: Option<ContractEnv>,
     ) -> Result<Value, RuntimeError> {
         let function_obj = Value::Function(method.clone());
-        self.push(Rc::new(RefCell::new(function_obj)));
+        self.push(SharedValue::from_value(function_obj));
 
         let args_len = args.len();
-        self.push(Rc::new(RefCell::new(this)));
+        self.push(SharedValue::from_value(this));
         for arg in args {
-            self.push(Rc::new(RefCell::new(arg)));
+            self.push(SharedValue::from_value(arg));
         }
 
         self.call(method, args_len + 1 /* this */, env)?;
@@ -259,15 +249,15 @@ impl VM {
         Ok(result)
     }
 
-    pub fn push(&mut self, value: Rc<RefCell<Value>>) {
+    pub fn push(&mut self, value: SharedValue) {
         self.stack.push(value)
     }
 
-    pub fn pop(&mut self) -> Result<Rc<RefCell<Value>>, RuntimeError> {
+    pub fn pop(&mut self) -> Result<SharedValue, RuntimeError> {
         self.stack.pop().ok_or(RuntimeError::StackUnderflow)
     }
 
-    pub fn stack_top(&self) -> Option<Rc<RefCell<Value>>> {
+    pub fn stack_top(&self) -> Option<SharedValue> {
         self.stack.last().cloned()
     }
 
@@ -276,7 +266,7 @@ impl VM {
         Ok(self.stack.len() - frame.base)
     }
 
-    pub fn stack_peek_from_top(&self, offset: usize) -> Result<Ref<Value>, RuntimeError> {
+    pub fn stack_peek_from_top(&self, offset: usize) -> Result<Ref<'_, Value>, RuntimeError> {
         let index = self
             .stack
             .len()
@@ -288,7 +278,7 @@ impl VM {
             .map(|v| v.borrow())
     }
 
-    pub fn stack_peek(&self, index: usize) -> Result<Rc<RefCell<Value>>, RuntimeError> {
+    pub fn stack_peek(&self, index: usize) -> Result<SharedValue, RuntimeError> {
         let frame = self.frames.last().ok_or(RuntimeError::NoCallFrame)?;
         self.stack
             .get(frame.base + index + 1)
@@ -296,11 +286,7 @@ impl VM {
             .ok_or(RuntimeError::StackIndexOutOfBound(index))
     }
 
-    pub fn stack_set(
-        &mut self,
-        index: usize,
-        value: Rc<RefCell<Value>>,
-    ) -> Result<(), RuntimeError> {
+    pub fn stack_set(&mut self, index: usize, value: SharedValue) -> Result<(), RuntimeError> {
         let frame = self.frames.last().ok_or(RuntimeError::NoCallFrame)?;
 
         if let Some(slot) = self.stack.get_mut(frame.base + index + 1) {
@@ -315,7 +301,7 @@ impl VM {
         let rhs = self.pop()?;
         let lhs = self.pop()?;
         let value = lhs.borrow().try_apply(op, Some(&rhs.borrow()))?;
-        self.push(Rc::new(RefCell::new(value)));
+        self.push(SharedValue::from_value(value));
         Ok(())
     }
 
@@ -379,7 +365,7 @@ impl VM {
                     self.pop()?;
                 }
                 self.pop()?; // native function object
-                self.push(Rc::new(RefCell::new(value)));
+                self.push(SharedValue::from_value(value));
                 *self.ip_mut()? += 1;
             }
         };
@@ -399,14 +385,14 @@ impl VM {
 
     pub fn run(&mut self, function: CompiledFunction) -> Result<Value, RuntimeError> {
         let function_obj = Value::Function(function.clone());
-        self.push(Rc::new(RefCell::new(function_obj)));
+        self.push(SharedValue::from_value(function_obj));
 
         self.call(function, 0, None)?;
 
         self.run_loop()
     }
 
-    pub fn eval(&mut self, function: CompiledFunction) -> Result<Value, RuntimeError> {
+    pub fn eval(&mut self, _function: CompiledFunction) -> Result<Value, RuntimeError> {
         todo!()
     }
 
@@ -435,7 +421,7 @@ impl VM {
                 Opcode::Neg => {
                     let lhs = self.pop()?;
                     let value = lhs.borrow().try_apply(Op::Neg, None)?;
-                    self.push(Rc::new(RefCell::new(value)));
+                    self.push(SharedValue::from_value(value));
                 }
 
                 Opcode::Lt => self.apply_binop(Op::Lt)?,
@@ -450,7 +436,7 @@ impl VM {
                 }
                 Opcode::Push(index) => {
                     let value = self.constant_get(index)?;
-                    self.push(Rc::new(RefCell::new(value.clone())));
+                    self.push(SharedValue::from_value(value.clone()));
                 }
 
                 Opcode::DefineGlobal(index) => {
@@ -580,7 +566,7 @@ impl VM {
                         .unwrap_or(&Value::Number(0.))
                         .clone();
 
-                    self.push(Rc::new(RefCell::new(value)));
+                    self.push(SharedValue::from_value(value));
                 }
                 Opcode::IndexSet => {
                     let value = self.pop()?;
@@ -627,7 +613,7 @@ impl VM {
                         .storage
                         .lock()
                         .get(addr as Address, "balance")
-                        .unwrap_or(Rc::new(RefCell::new(Value::Null)));
+                        .unwrap_or(SharedValue::from_null());
                     self.push(balance);
                 }
 
@@ -682,7 +668,7 @@ impl VM {
                         for _ in 0..pop_count {
                             self.pop()?;
                         }
-                        self.push(Rc::new(RefCell::new(return_value)));
+                        self.push(SharedValue::from_value(return_value));
                     } else {
                         self.pop()?; // main function
                         return Ok(return_value);
@@ -696,7 +682,7 @@ impl VM {
 
 impl ExecContext for VM {}
 
-fn trace(ip: usize, opcode: &Opcode, stack: &[Rc<RefCell<Value>>]) {
+fn trace(ip: usize, opcode: &Opcode, stack: &[SharedValue]) {
     use owo_colors::OwoColorize;
 
     let op_str = format!("{:?}", opcode).yellow().to_string();
@@ -711,32 +697,32 @@ fn trace(ip: usize, opcode: &Opcode, stack: &[Rc<RefCell<Value>>]) {
 }
 
 fn inject_builtins_variables(
-    injected: &mut HashMap<String, Rc<RefCell<Value>>>,
+    injected: &mut HashMap<String, SharedValue>,
     env: &ContractEnv,
     sender_balance: f64,
 ) {
     injected.insert(
         "msg.sender".into(),
-        Rc::new(RefCell::new(Value::Number(env.sender as f64))),
+        SharedValue::from_number(env.sender as f64),
     );
     injected.insert(
         "msg.balance".into(),
-        Rc::new(RefCell::new(Value::Number(sender_balance))),
+        SharedValue::from_number(sender_balance),
     );
     injected.insert(
         "msg.value".into(),
-        Rc::new(RefCell::new(Value::Number(env.value as f64))),
+        SharedValue::from_number(env.value as f64),
     );
     injected.insert(
         "block.number".into(),
-        Rc::new(RefCell::new(Value::Number(env.block_number as f64))),
+        SharedValue::from_number(env.block_number as f64),
     );
     injected.insert(
         "block.timestamp".into(),
-        Rc::new(RefCell::new(Value::Number(env.timestamp as f64))),
+        SharedValue::from_number(env.timestamp as f64),
     );
     injected.insert(
         "owner".into(),
-        Rc::new(RefCell::new(Value::Number(env.instance.owner as f64))),
+        SharedValue::from_number(env.instance.owner as f64),
     );
 }

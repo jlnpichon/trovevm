@@ -1,8 +1,7 @@
-use std::{cell::RefCell, rc::Rc};
-
 use trove_core::{
     ContractEnv, RuntimeError, Value, WorldState,
     contract::{CompiledContract, ContractOrInstance},
+    value::SharedValue,
 };
 use trove_vm::VM;
 use trovec::{codegen::compile, parser::parse_program};
@@ -129,11 +128,10 @@ fn test_balance() {
 
     let sender_address = 42;
 
-    world_state.storage.lock().set(
-        sender_address,
-        "balance",
-        Rc::new(RefCell::new(Value::Number(1337.0))),
-    );
+    world_state
+        .storage
+        .lock()
+        .set(sender_address, "balance", SharedValue::from_number(1337.0));
 
     let env = ContractEnv {
         sender: sender_address,
@@ -218,7 +216,7 @@ fn token_map_test() {
     world_state
         .storage
         .lock()
-        .set(bob, "balance", Rc::new(RefCell::new(Value::Number(1000.0))));
+        .set(bob, "balance", SharedValue::from_number(1000.0));
 
     let mut vm = VM::new();
     let instance = vm
@@ -320,7 +318,7 @@ fn test_transaction_failure_does_not_change_balances() {
     world_state
         .storage
         .lock()
-        .set(bob, "balance", Rc::new(RefCell::new(Value::Number(1000.0))));
+        .set(bob, "balance", SharedValue::from_number(1000.0));
 
     let mut vm = VM::new();
     let instance = vm
@@ -328,11 +326,10 @@ fn test_transaction_failure_does_not_change_balances() {
         .expect("deploy failed");
 
     // Init contract balance
-    world_state.storage.lock().set(
-        instance.address,
-        "balance",
-        Rc::new(RefCell::new(Value::Number(50.0))),
-    );
+    world_state
+        .storage
+        .lock()
+        .set(instance.address, "balance", SharedValue::from_number(50.0));
 
     let env_owner = ContractEnv {
         sender: bob,
@@ -354,6 +351,6 @@ fn test_transaction_failure_does_not_change_balances() {
     let sender_balance = storage.get(env_owner.sender, "balance").unwrap();
     let contract_balance = storage.get(env_owner.instance.address, "balance").unwrap();
 
-    assert_eq!(sender_balance, Rc::new(RefCell::new(Value::Number(1000.0))));
-    assert_eq!(contract_balance, Rc::new(RefCell::new(Value::Number(50.0))));
+    assert_eq!(sender_balance, SharedValue::from_number(1000.0));
+    assert_eq!(contract_balance, SharedValue::from_number(50.0));
 }

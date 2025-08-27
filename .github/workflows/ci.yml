@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: ["develop"]
+  pull_request:
+    branches: ["develop"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+          components: rustfmt
+      - name: Install stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check Formatting
+        run: cargo +nightly fmt --all -- --check
+
+      - name: Check Stable Compilation
+        run: cargo build --all-features
+
+      - uses: actions-rs/clippy-check@v1
+        with:
+          toolchain: stable
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --tests
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust: [stable]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - uses: taiki-e/install-action@nextest
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run tests
+        run: cargo nextest run --all --all-features --verbose

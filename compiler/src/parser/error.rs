@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::ops::Range;
 
 use ariadne::{ColorGenerator, Fmt, Label, Report, ReportKind};
 use pest::error::{ErrorVariant, InputLocation};
@@ -47,7 +48,7 @@ fn rule_to_message(rule: &Rule) -> Option<&str> {
 }
 
 impl ParseErrorWithContext {
-    pub fn report(&self) -> Report<(&std::string::String, std::ops::Range<usize>)> {
+    pub fn report(&self) -> Report<'_, (&String, Range<usize>)> {
         let mut colors = ColorGenerator::new();
 
         let a = colors.next();
@@ -98,10 +99,7 @@ impl ParseErrorWithContext {
         let is_whitespace_boxed: IsWhiteSpaceBoxed = Box::new(is_whitespace);
 
         let message = match &err.variant {
-            ErrorVariant::ParsingError {
-                positives,
-                negatives,
-            } => {
+            ErrorVariant::ParsingError { positives, .. } => {
                 if *positives == [Rule::Identifier] {
                     String::from("Missing identifier")
                 } else {

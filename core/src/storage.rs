@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::rc::Rc;
@@ -7,6 +6,7 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 
 use crate::contract::CompiledContract;
+use crate::value::SharedValue;
 use crate::{address::Address, value::Value};
 
 #[derive(Debug, Clone)]
@@ -36,18 +36,18 @@ impl SharedStorage {
 
 #[derive(Debug, Clone, Default)]
 pub struct InMemoryStorage {
-    memory: HashMap<Address, HashMap<String, Rc<RefCell<Value>>>>,
+    memory: HashMap<Address, HashMap<String, SharedValue>>,
 }
 
 impl InMemoryStorage {
     pub fn new() -> Self {
         Self::default()
     }
-    pub fn get(&self, address: Address, key: &str) -> Option<Rc<RefCell<Value>>> {
+    pub fn get(&self, address: Address, key: &str) -> Option<SharedValue> {
         self.memory.get(&address)?.get(key).cloned()
     }
 
-    pub fn set(&mut self, address: Address, key: &str, value: Rc<RefCell<Value>>) {
+    pub fn set(&mut self, address: Address, key: &str, value: SharedValue) {
         self.memory
             .entry(address)
             .or_default()
@@ -63,17 +63,11 @@ impl InMemoryStorage {
         let mut instance_map = HashMap::new();
 
         for var in &contract.vars {
-            instance_map.insert(var.clone(), Rc::new(RefCell::new(Value::Null)));
+            instance_map.insert(var.clone(), SharedValue::from_null());
         }
 
-        instance_map.insert(
-            "balance".to_string(),
-            Rc::new(RefCell::new(Value::Number(0.))),
-        );
-        instance_map.insert(
-            "owner".to_string(),
-            Rc::new(RefCell::new(Value::Number(sender as f64))),
-        );
+        instance_map.insert("balance".to_string(), SharedValue::from_number(0.));
+        instance_map.insert("owner".to_string(), SharedValue::from_number(sender as f64));
 
         self.memory.insert(address, instance_map);
     }
@@ -118,7 +112,7 @@ impl From<SerializableStorage> for InMemoryStorage {
         for (addr, slots_plain) in ss.memory {
             let mut slots = HashMap::new();
             for (k, v) in slots_plain {
-                slots.insert(k, Rc::new(RefCell::new(v)));
+                slots.insert(k, SharedValue::from_value(v));
             }
             memory.insert(addr, slots);
         }

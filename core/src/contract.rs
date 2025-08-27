@@ -1,10 +1,12 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
 use bincode::error::{DecodeError, EncodeError};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::{address::Address, function::CompiledFunction, storage::SharedStorage, value::Value};
+use crate::{
+    address::Address, function::CompiledFunction, storage::SharedStorage, value::SharedValue,
+};
 
 #[derive(Debug, Clone)]
 pub enum ContractOrInstance {
@@ -60,11 +62,11 @@ impl ContractInstance {
         }
     }
 
-    pub fn get_field(&mut self, key: &str) -> Option<Rc<RefCell<Value>>> {
+    pub fn get_field(&mut self, key: &str) -> Option<SharedValue> {
         self.storage.lock().get(self.address, key)
     }
 
-    pub fn set_field(&mut self, key: &str, value: Rc<RefCell<Value>>) {
+    pub fn set_field(&mut self, key: &str, value: SharedValue) {
         self.storage.lock().set(self.address, key, value)
     }
 

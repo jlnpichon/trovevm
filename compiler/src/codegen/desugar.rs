@@ -162,10 +162,10 @@ impl VisitorMut for DesugarBuiltins {
                     if let Some(expr) = new_expr {
                         *e = expr;
                     }
-                } else if let Expr::Literal(Literal::Number(_)) = object.as_mut() {
-                    if name.as_str() == "balance" {
-                        *e = Expr::BuiltinVariable(BuiltinVariableKind::Balance(object.clone()));
-                    }
+                } else if let Expr::Literal(Literal::Number(_)) = object.as_mut()
+                    && name.as_str() == "balance"
+                {
+                    *e = Expr::BuiltinVariable(BuiltinVariableKind::Balance(object.clone()));
                 }
             }
             Expr::Set { object, value, .. } => {
@@ -206,7 +206,7 @@ impl VisitorMut for DesugarBuiltins {
         Ok(())
     }
 
-    fn visit_literal_mut(&mut self, l: &mut Literal) -> Result<(), CompileError> {
+    fn visit_literal_mut(&mut self, _l: &mut Literal) -> Result<(), CompileError> {
         Ok(())
     }
 }

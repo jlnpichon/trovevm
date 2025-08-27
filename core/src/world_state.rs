@@ -1,9 +1,10 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
 use crate::{
     ContractInstance, Value,
     contract::{CompiledContract, ContractOrInstance},
     storage::{InMemoryStorage, SharedStorage},
+    value::SharedValue,
 };
 
 use super::address::Address;
@@ -28,11 +29,9 @@ impl WorldState {
     pub fn define_contract(&mut self, contract: CompiledContract) -> Address {
         let address = self.generate_address();
         self.contracts.insert(address, contract.clone());
-        self.storage.lock().set(
-            address,
-            "_contract",
-            Rc::new(RefCell::new(Value::ContractDef(contract))),
-        );
+        self.storage
+            .lock()
+            .set(address, "_contract", SharedValue::from_contract(contract));
         address
     }
 

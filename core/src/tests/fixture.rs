@@ -51,7 +51,7 @@ pub fn load_fixture_linewise<P: AsRef<std::path::Path>>(
     })
 }
 
-fn load_fixture<P: Into<PathBuf>>(path: P) -> Result<Fixture, Box<dyn std::error::Error>> {
+fn _load_fixture<P: Into<PathBuf>>(path: P) -> Result<Fixture, Box<dyn std::error::Error>> {
     let path = path.into();
     let content = std::fs::read_to_string(path)?;
 

@@ -16,6 +16,6 @@ pub enum EvalError {
     Runtime(#[from] Box<RuntimeError>),
 }
 
-pub fn eval(input: InputSource) -> Result<Value, EvalError> {
+pub fn eval(_input: InputSource) -> Result<Value, EvalError> {
     todo!()
 }

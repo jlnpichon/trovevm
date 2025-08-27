@@ -137,12 +137,6 @@ impl Program {
         self.constants.get(index)
     }
 
-    pub fn to_bytes(&self) -> Vec<u8> {
-        match self.bytecode {
-            _ => todo!(),
-        };
-    }
-
     pub fn as_slices(&self) -> (&[Opcode], &[Value]) {
         (&self.bytecode, &self.constants)
     }

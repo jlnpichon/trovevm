@@ -1,8 +1,9 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc, time::SystemTime};
+use std::{collections::HashMap, time::SystemTime};
 
 use trove_core::{
     CompiledFunction, RuntimeError, Value,
     function::{Callable, CompiledFunctionKind, ExecContext},
+    value::SharedValue,
 };
 
 pub type NativeFn = fn(&[Value], &mut dyn ExecContext) -> Result<Value, RuntimeError>;
@@ -33,7 +34,7 @@ impl Callable for Native {
 }
 
 pub fn install_natives(
-    globals: &mut HashMap<String, Rc<RefCell<Value>>>,
+    globals: &mut HashMap<String, SharedValue>,
     natives: &mut HashMap<String, Box<dyn Callable>>,
 ) {
     define_native(globals, natives, "clock", 0, clock);
@@ -42,7 +43,7 @@ pub fn install_natives(
 }
 
 fn define_native(
-    globals: &mut HashMap<String, Rc<RefCell<Value>>>,
+    globals: &mut HashMap<String, SharedValue>,
     natives: &mut HashMap<String, Box<dyn Callable>>,
     name: &'static str,
     arity: usize,
@@ -52,11 +53,11 @@ fn define_native(
     natives.insert(name.into(), Box::new(native));
     globals.insert(
         name.into(),
-        Rc::new(RefCell::new(Value::Function(CompiledFunction {
+        SharedValue::from_function(CompiledFunction {
             kind: CompiledFunctionKind::Native(name.to_string()),
             name: name.to_string(),
             arity,
-        }))),
+        }),
     );
 }
 
