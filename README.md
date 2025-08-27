@@ -45,15 +45,17 @@ Virtual Machine (VM) that serves both as:
 
 ## Architecture
 
+```text
 TroveLang Source (.trove)
-↓
+ ↓
 [Parser] (trove-parse) → Abstract Syntax Tree (AST)
-↓
+ ↓
 [Compiler] → (trove-vm/codegen) → Custom Bytecode
-↓
+ ↓
 [VM] (trove-vm) → Stack execution
-↓
+ ↓
 [Node] (trove-node) → Expose JSON-RPC over Websocket
+```
 
 ---
 
