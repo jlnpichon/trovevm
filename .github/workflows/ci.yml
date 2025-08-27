@@ -37,11 +37,11 @@ jobs:
       - name: Check Stable Compilation
         run: cargo build --all-features
 
-      - uses: actions-rs/clippy-check@v1
+      - name: Lint
+        uses: actions-rs/clippy-check@v1
         with:
-          toolchain: stable
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --tests
+          args: --all-features --all-targets
 
   test:
     runs-on: ubuntu-latest
