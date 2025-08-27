@@ -1,8 +1,7 @@
 # [TroveVM - A Minimalist Smart Contract VM Playground]
 
-[![CI](https://github.com/jlnpichon/trovevm/actions/workflows/ci.yml/badge.svg)](https://github.com/jlpichon/trovevm/actions/workflows/ci.yml)
+[![CI](https://github.com/jlnpichon/trovevm/actions/workflows/ci.yml/badge.svg)](https://github.com/jlnpichon/trovevm/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/github/v/release/jlnpichon/trovevm)]
 
 A lightweight and modular **toy Virtual Machine (VM)** designed for executing
 smart contracts, implemented in Rust. This project aims to provide a simple
